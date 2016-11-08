@@ -4,45 +4,22 @@
 cmake_minimum_required(VERSION 2.6 FATAL_ERROR)
 project(DuneDM)
 set(CMAKE_BUILD_TYPE Debug)
-set(LIBRARY_OUTPUT_PATH "${CMAKE_BINARY_DIR}/lib")
 set(EXECUTABLE_OUTPUT_PATH "${CMAKE_BINARY_DIR}/bin")
 
+set(EXROOTANALYSIS_PATH "" CACHE FILEPATH "Path to exrootanalysis")
+
 find_package(ROOT REQUIRED)
+include(${ROOT_USE_FILE})
 
+include_directories( ${PROJECT_SOURCE_DIR} ${ROOT_INCLUDE_DIRS} "${EXROOTANALYSIS_PATH}/ExRootAnalysis" )
+link_directories( ${ROOT_LIBRARY_DIR} ${EXROOTANALYSIS_PATH} )
 
-include_directories( ${PROJECT_SOURCE_DIR} ${ROOT_INCLUDE_DIR} )
-link_directories( ${ROOT_LIBRARY_DIR} )
+ROOT_GENERATE_DICTIONARY("${CMAKE_CURRENT_BINARY_DIR}/DuneDMDict.pcm" "${EXROOTANALYSIS_PATH}/ExRootAnalysis/ExRootClasses.h" LINKDEF "${PROJECT_SOURCE_DIR}/LinkDef.h" )
 
-#include(${ROOT_USE_FILE})
-#include(CMakeParseArguments)
-
-
-#----------------------------------------------------------------------------
-#
-# libDuneDM.so
-#
-#MESSAGE("--DuneDM- DuneDM section begin")
 file(GLOB DuneDM_SRCS ${PROJECT_SOURCE_DIR}/*.cpp)
-#file(GLOB DuneDM_HDRS ${PROJECT_SOURCE_DIR}/tree/*.h)
-#list(REMOVE_ITEM DuneDM_HDRS ${PROJECT_SOURCE_DIR}/tree/LinkDef.h)
 
-#MESSAGE("DuneDM_SRCS=${DuneDM_SRCS}")
-#MESSAGE(" ")
-#MESSAGE("DuneDM_HDRS=${DuneDM_HDRS}")
-#MESSAGE(" ")
-
-#set(DuneDM_LINKDEF ${PROJECT_SOURCE_DIR}/tree/LinkDef.h)
-# do not include ".cxx" here!!!!
-#set(DuneDM_DICTIONARY ${CMAKE_CURRENT_BINARY_DIR}/DuneDMDict)
-
-#MESSAGE("--DuneDM- about to ROOT_GENERATE_DICTIONARY ${DuneDM_DICTIONARY}")
-#MESSAGE("--rwh- ROOT_GENERATE_DICTIONARY ${DuneDM_DICTIONARY} ${DuneDM_HDRS} ${DuneDM_LINKDEF} ")
-#ROOT_GENERATE_DICTIONARY("${DuneDM_DICTIONARY}" "${DuneDM_HDRS}" LINKDEF "${DuneDM_LINKDEF}" )
-
-# add dictionary to list of source files
-#SET(DuneDM_SRCS ${DuneDM_SRCS} ${DuneDM_DICTIONARY})
-
-add_executable(DuneDM ${DuneDM_SRCS})
-target_link_libraries(DuneDM ${ROOT_LIBRARIES})
+add_definitions(${ROOT_DEFINITIONS})
+add_executable(DuneDM ${DuneDM_SRCS} "${CMAKE_CURRENT_BINARY_DIR}/DuneDMDict.pcm")
+target_link_libraries(DuneDM ${ROOT_LIBRARIES} libExRootAnalysis.so)
 
 
