@@ -53,7 +53,7 @@ int main (int argc, char** argv)
 			return 1;
 		}
 	
-		TClonesArray* array = new TClonesArray("TRootLHEFParticle", nentries);
+		TClonesArray* array = new TClonesArray("TRootLHEFParticle", 5);
 		b_Particles->SetAddress(&array);
 		
 		std::cout<<"Number of Entries " << nentries << std::endl;
