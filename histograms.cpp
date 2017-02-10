@@ -6,6 +6,7 @@
 #include <iterator>
 
 #include <TCanvas.h>
+#include <TFile.h>
 #include <TH2D.h>
 #include <TChain.h>
 #include <TGraph2D.h>
@@ -32,7 +33,11 @@ std::vector<std::string> split(const std::string &s, char delim) {
     return elems;
 }
 
-DarkMatterXMomentum::DarkMatterXMomentum(int nfiles) :
+////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////
+
+DarkMatterAnalysis::DarkMatterAnalysis(int nfiles) :
 	graph(new TGraph2D(nfiles)),
 	nfiles(nfiles),
 	index(0)
@@ -40,7 +45,12 @@ DarkMatterXMomentum::DarkMatterXMomentum(int nfiles) :
 	graph->SetTitle("#mu_{#chi pz};VP mass(GeV);#chi mass(GeV);#mu_{pz}(GeV/c^{2})");
 }
 
-void DarkMatterXMomentum::Fill(const std::string& file, TBranch* branch, int nentries)
+DarkMatterAnalysis::~DarkMatterAnalysis()
+{
+	delete graph;
+}
+
+void DarkMatterAnalysis::Fill(const std::string& file, TBranch* branch, int nentries)
 {
 	std::vector<std::string> params = split(file, '_');
 	if(params.size()<5){std::cout << "Tried to parse invalid filename: " << file << std::endl; return;}
@@ -50,6 +60,7 @@ void DarkMatterXMomentum::Fill(const std::string& file, TBranch* branch, int nen
 	double z = 0;
 	parser << params[1];
 	parser >> x;
+	if(parser.bad()){}
 	parser.clear();
 	parser << params[2];
 	parser >> y;
@@ -81,8 +92,12 @@ void DarkMatterXMomentum::Fill(const std::string& file, TBranch* branch, int nen
 	delete array;
 }
 
-void DarkMatterXMomentum::Save()
+void DarkMatterAnalysis::Save()
 {
+	/*mkdir("images", S_IRWXU | S_IRWXG | S_IRWXO);
+	std::string params(argv[2]);
+	std::string outputfilen(argv[3]);*/
+
 	TCanvas* canvas = new TCanvas("output", "", 1600,900);
 	canvas->SetFillColor(33);
 	canvas->SetFrameFillColor(17);
@@ -103,11 +118,92 @@ void DarkMatterXMomentum::Save()
 	delete canvas;
 }
 
-DarkMatterXMomentum::~DarkMatterXMomentum()
+////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////
+
+DarkMatterDistribution::DarkMatterDistribution(const std::string& particle, const std::string& attr)
 {
-	delete graph;
+	output = new TFile("out.root","RECREATE");
+	
+	std::stringstream parser;
+	parser << particle;
+	parser >> pdgCode;
+	if(parser.bad()){std::cout << "Error parsing requested particle pdgCode: " << particle << std::endl;}
+	
+	std::stringstream title;
+	switch(pdgCode)
+	{
+		case 33:
+		title << "#chi ";
+	}
+	
+	if(attr == "px")
+	{
+		attribute = &TRootLHEFParticle::Px;
+		title << "p_{x};p_{x}(GeV/c^{2})";
+	}
+	else if(attr == "py")
+	{
+		attribute = &TRootLHEFParticle::Py;
+		title << "p_{y};p_{y}(GeV/c^{2})";
+	}
+	else if(attr == "pz")
+	{
+		attribute = &TRootLHEFParticle::Pz;
+		title << "p_{z};p_{z}(GeV/c^{2})";
+	}
+	else if(attr == "e")
+	{
+		attribute = &TRootLHEFParticle::E;
+		title << "Energy;E(GeV)";
+	}
+	else if(attr == "m")
+	{
+		attribute = &TRootLHEFParticle::M;
+		title << "Mass;M(GeV)";
+	}
+	else
+	{
+		attribute = 0;
+		std::cout << "Invalid attribute: " << attr << std::endl;
+	}
+	
+	histo = new TH1D("Particle",title.str().c_str(),100,0,0);
 }
 
+DarkMatterDistribution::~DarkMatterDistribution()
+{
+	delete histo;
+	delete output;
+}
+
+void DarkMatterDistribution::Fill(TBranch* branch, int nentries)
+{
+	if(!attribute){std::cout << "Tried to fill histogram with invalid attribute.\n";}
+	TClonesArray* array = new TClonesArray("TRootLHEFParticle", 5);
+	branch->SetAddress(&array);
+		
+	for(Int_t i = 0; i < nentries; ++i)
+	{
+		branch->GetEntry(i);
+		for(Int_t j = 0; j < array->GetEntries(); ++j)
+		{
+			TRootLHEFParticle* particle = (TRootLHEFParticle*)array->At(j);
+			if(particle->PID==pdgCode)
+			{
+				histo->Fill(particle->*attribute);
+			}
+		}
+	}
+	histo->BufferEmpty();
+	
+}
+
+void DarkMatterDistribution::Save()
+{
+	output->Write(); 
+}
 
 /*
 std::string particle_names[5] = {"Pqd","Pqd1","Chi","Chi bar","V"}; 
