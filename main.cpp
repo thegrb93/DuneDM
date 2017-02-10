@@ -85,7 +85,7 @@ int main (int argc, char** argv)
 	for(int i = 1; i < argc; ++i)
 	{
 		char* str = argv[i];
-		if(str[0]=='-' && i+1<argc)
+		if(str[0]=='-')
 		{
 			std::string option(str+1);
 			if(option=="h")
@@ -100,7 +100,11 @@ int main (int argc, char** argv)
 			std::map<std::string,std::string>::iterator find = options.find(option);
 			if(find!=options.end())
 			{
-				find->second = option;
+				if(i+1<argc)
+				{
+					find->second = std::string(argv[i+1]);
+					++i;
+				}
 			}
 			else
 			{
