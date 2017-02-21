@@ -36,3 +36,10 @@ class DarkMatterDistribution
 	void Save();
 };
 
+class DetectorAnalysis
+{
+	public:
+	void Fill(const std::string& filen, TBranch* branch, int nentries);
+	void Save();
+};
+

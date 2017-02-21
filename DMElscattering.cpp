@@ -1,22 +1,12 @@
-// class DMscattering
+#include <iostream>
+#include <cmath>
 
-class DMscattering {
+#include "DMElscattering.h"
+#include "Particle.h"
+#include "Random.h"
+#include "Kinematics.h"
+#include "DUNEdet.h"
 
-	double Ee, Thetael;
-	double EDM, MDM;
-	double MDP;
-	double kappa, alphaD;
-public:
-	double EeTheta (double,double,double);
-	double EeTMax (double,double);
-	double EeTMin (double,double);
-	double F1 (double,double,double,double);
-	double dsigmadEe (double,double,double,double,double,double);
-	double F2 (double,double,double,double);
-	double sigma (double,double,double,double,double);
-	void probscatter(int &,int &,double &,double,double,double,double,Particle);
-	void scatterevent(int &,int &,double,double,double,double,Particle,Particle &);
-};
 // Electron energy as a function of 
 // electron scattering angle cross and dark matter energy
 double DMscattering::EeTheta (double EDM, double Thetael, double MDM) {
@@ -93,7 +83,7 @@ double DMscattering::sigma (double EDM, double MDM, double MDP, double kappa, do
 	return(rsig);
 }
 //
-void DMscattering::probscatter (int &dswitch, int &Nscat, double &pMax, double MDP, double MDM, double kap, double alD, Particle DM) {
+void DMscattering::probscatter (int &dswitch, int &Nscat, double &pMax, double MDP, double MDM, double kap, double alD, Particle &DM) {
 	double thetaX;
 	double pscat, Rscat;	
 	double LXdet, XS;
@@ -109,30 +99,35 @@ void DMscattering::probscatter (int &dswitch, int &Nscat, double &pMax, double M
 	detector det;
 	if (dswitch == 1) 
 	{
-		thetaX = kin.theta(DM.px,DM.py,DM.pz,DM.E);			
+		thetaX = kin.theta(DM.px,DM.py,DM.pz,DM.E);
+                //std::cout<<"thetaX"<<thetaX<<std::endl;			
 		LXdet = det.Ldet(thetaX);
+                //std::cout<<"LXdet  =  "<<LXdet<<"theta=  "<<thetaX<<"momentum are"<<DM.px<<"\t"<<DM.py<<"\t"<<DM.pz<<"\t"<<DM.E<< std::endl;	
 		LXdet = LXdet*convmcm;
 		XS = sigma(DM.E,MDM,MDP,kap,alD);
 		XS = XS*convGeV2cm2;
-                cout<<"cross section is"<<XS<<endl;
+               // std::cout<<"cross section is"<<XS<<std::endl;
 		prob = XS*ne*LXdet;
+                
 		if (prob > pMax) 
 		{
 			pMax = prob;
 	//		cout << pMax << endl;
 		}
 		Rscat = prob/pMax; 
+                std::cout<<"prob are"<<prob<<"\t"<<Rscat<<"\t"<<pscat<<std::endl;
 		if (Rscat > pscat) 
 		{
 			Nscat = Nscat+1;
 			dswitch = 2;
+                       std::cout<<"dswitch"<<dswitch<<std::endl;
 		}
 	}
 	
 	
 }
 //
-void DMscattering::scatterevent (int &dswitch, int &Nelec, double MDP, double MDM, double kap, double alD, Particle DM, Particle &electron) {
+void DMscattering::scatterevent (int &dswitch, int &Nelec, double MDP, double MDM, double kap, double alD, Particle &DM, Particle &electron) {
 	double Pi = 3.141592653589793;
 	double Me = 0.000511;
 	double EeMin, EeMax;
@@ -141,10 +136,12 @@ void DMscattering::scatterevent (int &dswitch, int &Nelec, double MDP, double MD
 	double dsig, sig, psig;
 	double dsigMax, psigMax;
 	double probe, Re;
-	
-
+	int eswitch;
+        //std::cout <<"value is" << pex <<"\t"<< pey <<"\t"<< pez <<"\t"<< Ee <<std::endl;
 	if (dswitch == 2) 
 	{
+
+                
 		eswitch = 0;
 		EeMax = EeTMax(DM.E,MDM);
 		EeMin = EeTMin(DM.E,MDM);
@@ -173,7 +170,7 @@ void DMscattering::scatterevent (int &dswitch, int &Nelec, double MDP, double MD
 				pez = pe*cos(Thetae);
 				electron.FourMomentum(pex,pey,pez,Ee);
 				Nelec = Nelec+1;
-				//cout << setw(15) << pex << setw(15) << pey << setw(15) << pez << setw(15) << Ee << endl;
+				
 			}	
 		}
 	}

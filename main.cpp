@@ -12,14 +12,14 @@
 
 #include "histograms.h"
 
-std::vector<std::string> files;
-std::map<std::string,std::string> options = {
+static std::vector<std::string> files;
+static std::map<std::string,std::string> options = {
 	{"mode", "distributions"},
 	{"particle", "33"},
 	{"attribute", "px"}
 };
 
-int getParticleBranch(TFile* file, TTree*& tree, TBranch*& branch)
+static int getParticleBranch(TFile* file, TTree*& tree, TBranch*& branch)
 {
 	if(!file->IsOpen())
 	{
@@ -43,7 +43,7 @@ int getParticleBranch(TFile* file, TTree*& tree, TBranch*& branch)
 	return 0;
 }
 
-void plotDistributions()
+static void plotDistributions()
 {
 	TFile* f = new TFile(files[0].c_str());
 	TTree* tree;
@@ -59,7 +59,7 @@ void plotDistributions()
 	distr.Save();
 }
 
-void plotStatistics()
+static void plotStatistics()
 {
 	DarkMatterAnalysis analysis(files.size());
 		
@@ -80,6 +80,22 @@ void plotStatistics()
 	analysis.Save();
 }
 
+static void plotSensitivity()
+{
+	TFile* f = new TFile(files[0].c_str());
+	TTree* tree;
+	TBranch* branch;
+	
+	if(getParticleBranch(f, tree, branch)) return;
+	
+	DetectorAnalysis distr;
+	int nentries = tree->GetEntries();
+	distr.Fill(files[0], branch, nentries);
+	delete f;
+	
+	distr.Save();
+}
+
 int main (int argc, char** argv)
 {
 	for(int i = 1; i < argc; ++i)
@@ -92,7 +108,7 @@ int main (int argc, char** argv)
 			{
 				std::cout << "Usage: DuneDM [options] <files>\n"
 							 "Options:\n"
-							 "-mode  --  distributions or statistics. (def. distributions)\n"
+							 "-mode  --  distributions, statistics, or detector. (def. distributions)\n"
 							 "-particle  --   particle pdgcode. (def. 33)\n"
 							 "-attribute  --  attribute to plot. (def. px)\n";
 				return 0;
@@ -123,6 +139,8 @@ int main (int argc, char** argv)
 			plotDistributions();
 		else if(mode=="statistics")
 			plotStatistics();
+		else if(mode=="detector")
+			plotSensitivity();
 		else
 			std::cout << "Invalid mode.\n";
 	}

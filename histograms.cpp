@@ -17,6 +17,13 @@
 #include "TClonesArray.h"
 #include "TObject.h"
 
+// Detector sensitivity headers
+#include "Particle.h"
+#include "Random.h"
+#include "Kinematics.h"
+#include "DUNEdet.h"
+#include "DMElscattering.h"
+
 template<typename Out>
 void split(const std::string &s, char delim, Out result) {
     std::stringstream ss;
@@ -31,6 +38,39 @@ std::vector<std::string> split(const std::string &s, char delim) {
     std::vector<std::string> elems;
     split(s, delim, std::back_inserter(elems));
     return elems;
+}
+
+int getDMParameters(const std::string& filen, double& vpmass, double& chimass, double& kappa, double& alpha)
+{
+	std::vector<std::string> params = split(filen, '_');
+	if(params.size()<5)
+	{
+		goto error;
+	}
+	
+	{
+		std::stringstream parser;
+		parser << params[1];
+		parser >> vpmass;
+		if(parser.bad()) goto error;
+		parser.clear();
+		parser << params[2];
+		parser >> chimass;
+		if(parser.bad()) goto error;
+		parser.clear();
+		parser << params[3];
+		parser >> kappa;
+		if(parser.bad()) goto error;
+		parser.clear();
+		parser << params[4];
+		parser >> alpha;
+		if(parser.bad()) goto error;
+		return 0;
+	}
+	
+	error:;
+	std::cout << "Tried to parse invalid filename: " << filen << std::endl;
+	return 1;
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -50,20 +90,12 @@ DarkMatterAnalysis::~DarkMatterAnalysis()
 	delete graph;
 }
 
-void DarkMatterAnalysis::Fill(const std::string& file, TBranch* branch, int nentries)
+void DarkMatterAnalysis::Fill(const std::string& filen, TBranch* branch, int nentries)
 {
-	std::vector<std::string> params = split(file, '_');
-	if(params.size()<5){std::cout << "Tried to parse invalid filename: " << file << std::endl; return;}
-	std::stringstream parser;
+	double vpmass, chimass, kappa, alpha;
+	if(getDMParameters(filen, vpmass, chimass, kappa, alpha)) return;
 	
-	double x, y;
 	double z = 0;
-	parser << params[1];
-	parser >> x;
-	if(parser.bad()){}
-	parser.clear();
-	parser << params[2];
-	parser >> y;
 	
 	TClonesArray* array = new TClonesArray("TRootLHEFParticle", 5);
 	branch->SetAddress(&array);
@@ -86,7 +118,7 @@ void DarkMatterAnalysis::Fill(const std::string& file, TBranch* branch, int nent
 	}
 	
 	z /= (double)nentries;
-	graph->SetPoint(index, x, y, z);
+	graph->SetPoint(index, vpmass, chimass, z);
 	++index;
 	
 	delete array;
@@ -197,13 +229,92 @@ void DarkMatterDistribution::Fill(TBranch* branch, int nentries)
 		}
 	}
 	histo->BufferEmpty();
-	
+	delete array;
 }
 
 void DarkMatterDistribution::Save()
 {
 	output->Write(); 
 }
+
+////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////
+
+void DetectorAnalysis::Fill(const std::string& filen, TBranch* branch, int nentries)
+{
+	double vpmass, chimass, kappa, alpha;
+	if(getDMParameters(filen, vpmass, chimass, kappa, alpha)) return;
+	
+	const double emass = 0.000511;
+	
+	Particle darkphoton(vpmass);
+	Particle darkmatter1(chimass);
+	Particle darkmatter2(chimass);
+	Particle electron1(emass);
+	Particle electron2(emass);
+	
+	Kinematics kin;	
+	detector det;
+	DMscattering scatter;
+	
+	int scatterCount = 0;
+	int Nscatter;
+	int Nelectron;
+	double probMax = 10e-15;
+	
+	TFile* output = new TFile("output.root", "RECREATE");
+	TH1D* dmpz = new TH1D("dmpz","Dark matter Scatter P_{z};P_{z} (GeV/c^{2})", 100, 0, 0);
+	TH1D* dme = new TH1D("dme","Dark matter Scatter E;E (GeV)", 100, 0, 0);
+	TH1D* epz = new TH1D("epz","Electron Scatter P_{z};P_{z} (GeV/c^{2})", 100, 0, 0);
+	TH1D* ee = new TH1D("ee","Electron Scatter E;E (GeV)", 100, 0, 0);
+	
+	TClonesArray* array = new TClonesArray("TRootLHEFParticle", 5);
+	branch->SetAddress(&array);
+		
+	for(Int_t i = 0; i < nentries; ++i)
+	{
+		branch->GetEntry(i);
+		for(Int_t j = 0; j < array->GetEntries(); ++j)
+		{
+			TRootLHEFParticle* particle = (TRootLHEFParticle*)array->At(j);
+			if(particle->PID==33)
+			{
+				darkmatter1.FourMomentum(particle->Px,particle->Py,-particle->Pz,particle->E);
+				
+				int DMSwitch = 0;
+				det.intersect(DMSwitch,scatterCount,darkmatter1);
+				scatter.probscatter(DMSwitch,Nscatter,probMax,vpmass,chimass,kappa,alpha,darkmatter1);
+				scatter.scatterevent(DMSwitch,Nelectron,vpmass,chimass,kappa,alpha,darkmatter1,electron1);
+				if(DMSwitch == 2)
+				{
+					dmpz->Fill(darkmatter1.pz);
+					dme->Fill(darkmatter1.E);
+					epz->Fill(electron1.pz);
+					ee->Fill(electron1.E);
+				}	
+			}
+		}
+	}
+	dmpz->BufferEmpty();
+	dme->BufferEmpty();
+	epz->BufferEmpty();
+	ee->BufferEmpty();
+	output->Write();
+	
+	delete dmpz;
+	delete dme;
+	delete epz;
+	delete ee;
+	delete output;
+	delete array;
+}
+
+void DetectorAnalysis::Save()
+{
+
+}
+
 
 /*
 std::string particle_names[5] = {"Pqd","Pqd1","Chi","Chi bar","V"}; 
