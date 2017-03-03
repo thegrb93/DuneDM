@@ -71,7 +71,7 @@ protected:
 class DetectorAnalysis : public DMAnalysis
 {
 	std::string detectorType;
-	double smear_sig;
+	double smear_sigma;
 	double smear_mean;
 public:
 	DetectorAnalysis();

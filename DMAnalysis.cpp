@@ -327,9 +327,9 @@ void DetectorAnalysis::Init()
 		detectorType = "LArTPC";
 	
 	if(gOptions[OPT_DET_SMEAR_SIG])
-		smear_sig = toDouble(gOptions[OPT_DET_SMEAR_SIG].last()->arg);
+		smear_sigma = toDouble(gOptions[OPT_DET_SMEAR_SIG].last()->arg);
 	else
-		smear_sig = 0;
+		smear_sigma = 0;
 	
 	if(gOptions[OPT_DET_SMEAR_MEAN])
 		smear_mean = toDouble(gOptions[OPT_DET_SMEAR_MEAN].last()->arg);
@@ -376,6 +376,13 @@ void DetectorAnalysis::Analyze(const std::string& filen)
 			TRootLHEFParticle* particle = (TRootLHEFParticle*)array->At(j);
 			if(particle->PID==33)
 			{
+				if(smear_sigma>0)
+				{
+					particle->Px += Random::Gauss(smear_mean, smear_sigma);
+					particle->Py += Random::Gauss(smear_mean, smear_sigma);
+					particle->Pz += Random::Gauss(smear_mean, smear_sigma);
+					particle->E += Random::Gauss(smear_mean, smear_sigma);
+				}
 				darkmatter1.FourMomentum(particle->Px,particle->Py,-particle->Pz,particle->E);
 				
 				int DMSwitch = 0;
