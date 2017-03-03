@@ -9,11 +9,13 @@ const option::Descriptor usage[] =
 	{OPT_UNKNOWN, 0,"" , ""    ,option::Arg::None, "USAGE: DuneDM [options] files\n\n"
 		                                     "Options:" },
 	{OPT_HELP,    0,"h" , "help", option::Arg::None, "  --help, -h  \tPrint usage and exit." },
-	{OPT_MODE,    0,"", "mode", option::Arg::Optional, "  --mode, -p  \tIncrement count." },
-	{OPT_PARTICLE, 0,"" ,  "particle"   ,option::Arg::Optional, "Examples:\n"
-		                                     "  example --unknown -- --this_is_no_option\n"
-		                                     "  example -unk --plus -ppp file1 file2\n" },
-	{OPT_PARTICLEATTRIBUTE, 0, "", "attribute", option::Arg::Optional, ""},
+	{OPT_MODE,    0,"", "mode", option::Arg::Optional, "  --mode  \tMode to use.\n"
+                                                       "statistics: Plots particle parameters with respect to masses.\nhistograms: Plots a distribution given a particle type and parameter.\ndetector: Simulates detector response and plots the distribution." },
+	{OPT_PARTICLE, 0,"" ,  "particle"   ,option::Arg::Optional, "  --particle  \tParticle pdgcode" },
+	{OPT_PARTICLEATTRIBUTE, 0, "", "attribute", option::Arg::Optional, "  --attribute  \tName of the attribute you want to plot;\nThis is for histogram mode."},
+	{OPT_DETECTOR, 0, "", "detector", option::Arg::Optional, "  --detector  \tName of the detector to use."},
+	{OPT_DET_SMEAR_SIG, 0, "", "smearsig", option::Arg::Optional, "  --smearsig  \tThe smearing sigma to use in the detector."},
+	{OPT_DET_SMEAR_MEAN, 0, "", "smearmean", option::Arg::Optional, "  --smearmean  \tThe smearing mean to use in the detector."},
 	{0,0,0,0,0,0}
 };
  
@@ -26,9 +28,9 @@ int main (int argc, char** argv)
 		return 0;
 	}
 	
-	option::Stats  stats(usage, argc, argv);
+	option::Stats  stats(usage, argc-1, argv+1);
 	option::Option options[stats.options_max], buffer[stats.buffer_max];
-	option::Parser parse(usage, argc, argv, options, buffer);
+	option::Parser parse(usage, argc-1, argv+1, options, buffer);
 	gOptions = options;
 
 	if (parse.error())
@@ -50,7 +52,7 @@ int main (int argc, char** argv)
 		else
 			mode = "detector";
 			
-		std::map<std::string,ROOTAnalysis*(*)()> modes = {
+		std::map<std::string,DMAnalysis*(*)()> modes = {
 			{"statisics", &StatisticsAnalysis::create},
 			{"histograms", &DarkMatterDistribution::create},
 			{"detector", &DetectorAnalysis::create}
@@ -59,7 +61,7 @@ int main (int argc, char** argv)
 		auto constructor = modes.find(mode);
 		if(constructor != modes.end())
 		{
-			ROOTAnalysis* analysis = (constructor->second)();
+			DMAnalysis* analysis = (constructor->second)();
 			
 			for (int i = 0; i < parse.nonOptionsCount(); ++i)
 				analysis->files.push_back(parse.nonOption(i));

@@ -6,7 +6,7 @@
 
 enum optionIndex {
 OPT_UNKNOWN, OPT_HELP, OPT_MODE, OPT_PARTICLE, OPT_PARTICLEATTRIBUTE,
-OPT_DETECTOR};
+OPT_DETECTOR, OPT_DET_SMEAR_SIG, OPT_DET_SMEAR_MEAN};
 
 extern option::Option* gOptions;
 
@@ -17,12 +17,12 @@ class TGraph2D;
 class TH1D;
 class TRootLHEFParticle;
 
-class ROOTAnalysis
+class DMAnalysis
 {
 public:
 	std::vector<std::string> files;
-	ROOTAnalysis();
-	virtual ~ROOTAnalysis();
+	DMAnalysis();
+	virtual ~DMAnalysis();
 	int Process();
 	
 	static int DMParameters(const std::string& filen, double& vpmass, double& chimass, double& kappa, double& alpha);
@@ -34,7 +34,7 @@ protected:
 	virtual void UnInit() = 0;
 };
 
-class StatisticsAnalysis : public ROOTAnalysis
+class StatisticsAnalysis : public DMAnalysis
 {
 	TGraph2D* graph;
 	int index;
@@ -42,7 +42,7 @@ class StatisticsAnalysis : public ROOTAnalysis
 public:
 	StatisticsAnalysis();
 	~StatisticsAnalysis();
-	static ROOTAnalysis* create();
+	static DMAnalysis* create();
 
 protected:
 	void Analyze(const std::string& file);
@@ -50,7 +50,7 @@ protected:
 	void UnInit();
 };
 
-class DarkMatterDistribution : public ROOTAnalysis
+class DarkMatterDistribution : public DMAnalysis
 {
 	TFile* output;
 	TH1D* histo;
@@ -60,7 +60,7 @@ class DarkMatterDistribution : public ROOTAnalysis
 public:
 	DarkMatterDistribution();
 	~DarkMatterDistribution();
-	static ROOTAnalysis* create();
+	static DMAnalysis* create();
 
 protected:
 	void Analyze(const std::string& file);
@@ -68,12 +68,15 @@ protected:
 	void UnInit();
 };
 
-class DetectorAnalysis : public ROOTAnalysis
+class DetectorAnalysis : public DMAnalysis
 {
+	std::string detector;
+	double smear_sig;
+	double smear_mean;
 public:
 	DetectorAnalysis();
 	~DetectorAnalysis();
-	static ROOTAnalysis* create();
+	static DMAnalysis* create();
 protected:
 	void Analyze(const std::string& file);
 	void Init();

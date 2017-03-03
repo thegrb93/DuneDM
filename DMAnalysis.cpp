@@ -28,16 +28,16 @@
 
 
 
-ROOTAnalysis::ROOTAnalysis():
+DMAnalysis::DMAnalysis():
 branch(0),
 nentries(0)
 {
 }
-ROOTAnalysis::~ROOTAnalysis()
+DMAnalysis::~DMAnalysis()
 {
 }
 
-int ROOTAnalysis::Process()
+int DMAnalysis::Process()
 {
 	Init();
 	for(std::vector<std::string>::iterator fname = files.begin(); fname!=files.end(); ++fname) {
@@ -72,7 +72,7 @@ int ROOTAnalysis::Process()
 	return 0;
 }
 
-int ROOTAnalysis::DMParameters(const std::string& filen, double& vpmass, double& chimass, double& kappa, double& alpha)
+int DMAnalysis::DMParameters(const std::string& filen, double& vpmass, double& chimass, double& kappa, double& alpha)
 {
 	std::vector<std::string> params;
 	std::stringstream ss(filen);
@@ -119,7 +119,7 @@ StatisticsAnalysis::StatisticsAnalysis()
 {
 }
 
-ROOTAnalysis* StatisticsAnalysis::create()
+DMAnalysis* StatisticsAnalysis::create()
 {
 	return new StatisticsAnalysis();
 }
@@ -204,7 +204,7 @@ DarkMatterDistribution::DarkMatterDistribution()
 {
 }
 
-ROOTAnalysis* DarkMatterDistribution::create()
+DMAnalysis* DarkMatterDistribution::create()
 {
 	return new DarkMatterDistribution();
 }
@@ -310,7 +310,7 @@ DetectorAnalysis::DetectorAnalysis()
 {
 }
 
-ROOTAnalysis* DetectorAnalysis::create()
+DMAnalysis* DetectorAnalysis::create()
 {
 	return new DetectorAnalysis();
 }
@@ -321,6 +321,27 @@ DetectorAnalysis::~DetectorAnalysis()
 
 void DetectorAnalysis::Init()
 {
+	if(gOptions[OPT_DETECTOR])
+		detector = gOptions[OPT_DETECTOR].last()->arg;
+	else
+		detector = "LArTPC";
+	
+	double toDouble(const char* s)
+	{
+		std::stringstream ss(std::string(s));
+		double d; ss>>d;
+		if(ss.good()) return d; else return 0;
+	}
+	
+	if(gOptions[OPT_DET_SMEAR_SIG])
+		smear_sig = toDouble(gOptions[OPT_DET_SMEAR_SIG].last()->arg);
+	else
+		smear_sig = 0;
+	
+	if(gOptions[OPT_DET_SMEAR_MEAN])
+		smear_mean = toDouble(gOptions[OPT_DET_SMEAR_MEAN].last()->arg);
+	else
+		smear_mean = 0;
 }
 
 void DetectorAnalysis::Analyze(const std::string& filen)
