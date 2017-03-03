@@ -3,8 +3,7 @@
 #include <sys/stat.h>
 #include <iostream>
 #include <sstream>
-#include <algorithm>
-#include <iterator>
+#include <regex>
 
 #include <TCanvas.h>
 #include <TFile.h>
@@ -72,35 +71,27 @@ int DMAnalysis::Process()
 	return 0;
 }
 
+std::regex param_match(".+?_([\\d\\.]+)_([\\d\\.]+)_([\\d\\.]+)_([\\d\\.]+)\\.root");
 int DMAnalysis::DMParameters(const std::string& filen, double& vpmass, double& chimass, double& kappa, double& alpha)
 {
-	std::vector<std::string> params;
-	std::stringstream ss(filen);
-    std::string item;
-    while (std::getline(ss, item, '_')) {
-        params.push_back(item);
-    }
+	std::smatch matches;
+	if(!std::regex_match(filen, matches, param_match)) goto error;
 
-	if(params.size()<5)
-	{
-		goto error;
-	}
-	
 	{
 		std::stringstream parser;
-		parser << params[1];
+		parser << matches[1];
 		parser >> vpmass;
 		if(parser.bad()) goto error;
 		parser.clear();
-		parser << params[2];
+		parser << matches[2];
 		parser >> chimass;
 		if(parser.bad()) goto error;
 		parser.clear();
-		parser << params[3];
+		parser << matches[3];
 		parser >> kappa;
 		if(parser.bad()) goto error;
 		parser.clear();
-		parser << params[4];
+		parser << matches[4];
 		parser >> alpha;
 		if(parser.bad()) goto error;
 		return 0;
@@ -319,19 +310,21 @@ DetectorAnalysis::~DetectorAnalysis()
 {
 }
 
+static double toDouble(const char* s)
+{
+	std::stringstream ss;
+	ss << std::string(s);
+	double d;
+	ss >> d;
+	if(ss.good()) return d; else return 0;
+}
+
 void DetectorAnalysis::Init()
 {
 	if(gOptions[OPT_DETECTOR])
-		detector = gOptions[OPT_DETECTOR].last()->arg;
+		detectorType = gOptions[OPT_DETECTOR].last()->arg;
 	else
-		detector = "LArTPC";
-	
-	double toDouble(const char* s)
-	{
-		std::stringstream ss(std::string(s));
-		double d; ss>>d;
-		if(ss.good()) return d; else return 0;
-	}
+		detectorType = "LArTPC";
 	
 	if(gOptions[OPT_DET_SMEAR_SIG])
 		smear_sig = toDouble(gOptions[OPT_DET_SMEAR_SIG].last()->arg);
