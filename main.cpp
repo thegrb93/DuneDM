@@ -1,151 +1,77 @@
 // main program
 #include <iostream>
 #include <vector>
-#include <sstream>
+#include <map>
+#include "DMAnalysis.h"
 
-#include <sys/stat.h>
-
-#include <TApplication.h>
-#include <TROOT.h>
-#include <TFile.h>
-#include <TTree.h>
-
-#include "histograms.h"
-
-static std::vector<std::string> files;
-static std::map<std::string,std::string> options = {
-	{"mode", "distributions"},
-	{"particle", "33"},
-	{"attribute", "px"}
+const option::Descriptor usage[] =
+{
+	{OPT_UNKNOWN, 0,"" , ""    ,option::Arg::None, "USAGE: DuneDM [options] files\n\n"
+		                                     "Options:" },
+	{OPT_HELP,    0,"h" , "help", option::Arg::None, "  --help, -h  \tPrint usage and exit." },
+	{OPT_MODE,    0,"", "mode", option::Arg::Optional, "  --mode, -p  \tIncrement count." },
+	{OPT_PARTICLE, 0,"" ,  "particle"   ,option::Arg::Optional, "Examples:\n"
+		                                     "  example --unknown -- --this_is_no_option\n"
+		                                     "  example -unk --plus -ppp file1 file2\n" },
+	{OPT_PARTICLEATTRIBUTE, 0, "", "attribute", option::Arg::Optional, ""},
+	{0,0,0,0,0,0}
 };
-
-static int getParticleBranch(TFile* file, TTree*& tree, TBranch*& branch)
-{
-	if(!file->IsOpen())
-	{
-		std::cout << "Failed to open file: " << file->GetName() << std::endl;
-		return 1;
-	}
-
-	file->GetObject("LHEF",tree);
-	if(!tree) {
-		std::cout << "Root couldn't find LHEF tree in the input root file.\n";
-		return 1;
-	}
-	Long64_t nentries = tree->GetEntries();	
-
-	branch = tree->GetBranch("Particle");
-	if(!branch) {
-		std::cout << "Root couldn't find Particle branch in the LHEF tree.\n";
-		return 1;
-	}
-	
-	return 0;
-}
-
-static void plotDistributions()
-{
-	TFile* f = new TFile(files[0].c_str());
-	TTree* tree;
-	TBranch* branch;
-	
-	if(getParticleBranch(f, tree, branch)) return;
-	
-	DarkMatterDistribution distr(options["particle"],options["attribute"]);
-	int nentries = tree->GetEntries();
-	distr.Fill(branch, nentries);
-	delete f;
-	
-	distr.Save();
-}
-
-static void plotStatistics()
-{
-	DarkMatterAnalysis analysis(files.size());
-		
-	for(std::vector<std::string>::iterator i = files.begin(); i!=files.end(); ++i) {
-		TFile* f = new TFile(i->c_str());
-		TTree* tree;
-		TBranch* branch;
-		if(getParticleBranch(f, tree, branch)) return;
-
-		int nentries = tree->GetEntries();
-		std::cout<<"File (" << (i-files.begin()+1) <<"/"<< files.size() << "), number of entries: " << nentries << std::endl;
-		analysis.Fill(*i, branch, nentries);
-		
-		delete f;
-	}
-	std::cout << "Done processing.\n";
-
-	analysis.Save();
-}
-
-static void plotSensitivity()
-{
-	TFile* f = new TFile(files[0].c_str());
-	TTree* tree;
-	TBranch* branch;
-	
-	if(getParticleBranch(f, tree, branch)) return;
-	
-	DetectorAnalysis distr;
-	int nentries = tree->GetEntries();
-	distr.Fill(files[0], branch, nentries);
-	delete f;
-	
-	distr.Save();
-}
+ 
+option::Option* gOptions;
 
 int main (int argc, char** argv)
 {
-	for(int i = 1; i < argc; ++i)
-	{
-		char* str = argv[i];
-		if(str[0]=='-')
-		{
-			std::string option(str+1);
-			if(option=="h")
-			{
-				std::cout << "Usage: DuneDM [options] <files>\n"
-							 "Options:\n"
-							 "-mode  --  distributions, statistics, or detector. (def. distributions)\n"
-							 "-particle  --   particle pdgcode. (def. 33)\n"
-							 "-attribute  --  attribute to plot. (def. px)\n";
-				return 0;
-			}
-			std::map<std::string,std::string>::iterator find = options.find(option);
-			if(find!=options.end())
-			{
-				if(i+1<argc)
-				{
-					find->second = std::string(argv[i+1]);
-					++i;
-				}
-			}
-			else
-			{
-				std::cout << "Invalid option: " << option << "\n";
-				return 0;
-			}
-		}
-		else
-			files.push_back(std::string(str));
+	if(argc<2){
+		option::printUsage(std::cout, usage);
+		return 0;
+	}
+	
+	option::Stats  stats(usage, argc, argv);
+	option::Option options[stats.options_max], buffer[stats.buffer_max];
+	option::Parser parse(usage, argc, argv, options, buffer);
+	gOptions = options;
+
+	if (parse.error())
+		return 1;
+
+	if (options[OPT_HELP]) {
+		option::printUsage(std::cout, usage);
+		return 0;
 	}
 
-	if(files.size()>0)
+	for (option::Option* opt = options[OPT_UNKNOWN]; opt; opt = opt->next())
+		std::cout << "Unknown option: " << opt->name << "\n";
+
+	if(parse.nonOptionsCount()>0)
 	{
-		std::string mode = options["mode"];
-		if(mode=="distributions")
-			plotDistributions();
-		else if(mode=="statistics")
-			plotStatistics();
-		else if(mode=="detector")
-			plotSensitivity();
+		std::string mode;
+		if(options[OPT_MODE])
+			mode = std::string(options[OPT_MODE].last()->arg);
 		else
-			std::cout << "Invalid mode.\n";
+			mode = "detector";
+			
+		std::map<std::string,ROOTAnalysis*(*)()> modes = {
+			{"statisics", &StatisticsAnalysis::create},
+			{"histograms", &DarkMatterDistribution::create},
+			{"detector", &DetectorAnalysis::create}
+		};
+
+		auto constructor = modes.find(mode);
+		if(constructor != modes.end())
+		{
+			ROOTAnalysis* analysis = (constructor->second)();
+			
+			for (int i = 0; i < parse.nonOptionsCount(); ++i)
+				analysis->files.push_back(parse.nonOption(i));
+			
+			analysis->Process();
+			delete analysis;
+		}
+		else
+			std::cout << "Invalid mode: " << mode << std::endl;
 	}
 	else
-		std::cout << "Expected input root files.\n";
+		std::cout << "Expected input root files. Got none.\n";
 
 	return 0;
 }

@@ -1,5 +1,6 @@
-#include "histograms.h"
+#include "DMAnalysis.h"
 
+#include <sys/stat.h>
 #include <iostream>
 #include <sstream>
 #include <algorithm>
@@ -7,6 +8,7 @@
 
 #include <TCanvas.h>
 #include <TFile.h>
+#include <TTree.h>
 #include <TH2D.h>
 #include <TChain.h>
 #include <TGraph2D.h>
@@ -24,25 +26,61 @@
 #include "DUNEdet.h"
 #include "DMElscattering.h"
 
-template<typename Out>
-void split(const std::string &s, char delim, Out result) {
-    std::stringstream ss;
-    ss.str(s);
-    std::string item;
-    while (std::getline(ss, item, delim)) {
-        *(result++) = item;
-    }
-}
 
-std::vector<std::string> split(const std::string &s, char delim) {
-    std::vector<std::string> elems;
-    split(s, delim, std::back_inserter(elems));
-    return elems;
-}
 
-int getDMParameters(const std::string& filen, double& vpmass, double& chimass, double& kappa, double& alpha)
+ROOTAnalysis::ROOTAnalysis():
+branch(0),
+nentries(0)
 {
-	std::vector<std::string> params = split(filen, '_');
+}
+ROOTAnalysis::~ROOTAnalysis()
+{
+}
+
+int ROOTAnalysis::Process()
+{
+	Init();
+	for(std::vector<std::string>::iterator fname = files.begin(); fname!=files.end(); ++fname) {
+		TFile* file = new TFile(fname->c_str());
+		TTree* tree;
+		
+		if(!file->IsOpen())
+		{
+			std::cout << "Failed to open file: " << file->GetName() << std::endl;
+			return 1;
+		}
+
+		file->GetObject("LHEF",tree);
+		if(!tree) {
+			std::cout << "Root couldn't find LHEF tree in the input root file.\n";
+			return 1;
+		}
+		nentries = tree->GetEntries();	
+
+		branch = tree->GetBranch("Particle");
+		if(!branch) {
+			std::cout << "Root couldn't find Particle branch in the LHEF tree.\n";
+			return 1;
+		}
+
+		Analyze(*fname);
+
+		delete file;
+	}
+	
+	UnInit();
+	return 0;
+}
+
+int ROOTAnalysis::DMParameters(const std::string& filen, double& vpmass, double& chimass, double& kappa, double& alpha)
+{
+	std::vector<std::string> params;
+	std::stringstream ss(filen);
+    std::string item;
+    while (std::getline(ss, item, '_')) {
+        params.push_back(item);
+    }
+
 	if(params.size()<5)
 	{
 		goto error;
@@ -77,23 +115,31 @@ int getDMParameters(const std::string& filen, double& vpmass, double& chimass, d
 ////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////
 
-DarkMatterAnalysis::DarkMatterAnalysis(int nfiles) :
-	graph(new TGraph2D(nfiles)),
-	nfiles(nfiles),
-	index(0)
+StatisticsAnalysis::StatisticsAnalysis()
 {
-	graph->SetTitle("#mu_{#chi pz};VP mass(GeV);#chi mass(GeV);#mu_{pz}(GeV/c^{2})");
 }
 
-DarkMatterAnalysis::~DarkMatterAnalysis()
+ROOTAnalysis* StatisticsAnalysis::create()
+{
+	return new StatisticsAnalysis();
+}
+
+StatisticsAnalysis::~StatisticsAnalysis()
 {
 	delete graph;
 }
 
-void DarkMatterAnalysis::Fill(const std::string& filen, TBranch* branch, int nentries)
+void StatisticsAnalysis::Init()
+{
+	index = 0;
+	graph = new TGraph2D(files.size());
+	graph->SetTitle("#mu_{#chi pz};VP mass(GeV);#chi mass(GeV);#mu_{pz}(GeV/c^{2})");
+}
+
+void StatisticsAnalysis::Analyze(const std::string& filen)
 {
 	double vpmass, chimass, kappa, alpha;
-	if(getDMParameters(filen, vpmass, chimass, kappa, alpha)) return;
+	if(DMParameters(filen, vpmass, chimass, kappa, alpha)) return;
 	
 	double z = 0;
 	
@@ -124,7 +170,7 @@ void DarkMatterAnalysis::Fill(const std::string& filen, TBranch* branch, int nen
 	delete array;
 }
 
-void DarkMatterAnalysis::Save()
+void StatisticsAnalysis::UnInit()
 {
 	/*mkdir("images", S_IRWXU | S_IRWXG | S_IRWXO);
 	std::string params(argv[2]);
@@ -154,8 +200,33 @@ void DarkMatterAnalysis::Save()
 ////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////
 
-DarkMatterDistribution::DarkMatterDistribution(const std::string& particle, const std::string& attr)
+DarkMatterDistribution::DarkMatterDistribution()
 {
+}
+
+ROOTAnalysis* DarkMatterDistribution::create()
+{
+	return new DarkMatterDistribution();
+}
+
+DarkMatterDistribution::~DarkMatterDistribution()
+{
+	delete histo;
+	delete output;
+}
+
+void DarkMatterDistribution::Init()
+{
+	std::string particle, attr;
+	if(gOptions[OPT_PARTICLE])
+		particle = std::string(gOptions[OPT_PARTICLE].last()->arg);
+	else
+		particle = "33";
+	if(gOptions[OPT_PARTICLEATTRIBUTE])
+		attr = std::string(gOptions[OPT_PARTICLEATTRIBUTE].last()->arg);
+	else
+		attr = "px";
+	
 	output = new TFile("out.root","RECREATE");
 	
 	std::stringstream parser;
@@ -204,13 +275,7 @@ DarkMatterDistribution::DarkMatterDistribution(const std::string& particle, cons
 	histo = new TH1D("Particle",title.str().c_str(),100,0,0);
 }
 
-DarkMatterDistribution::~DarkMatterDistribution()
-{
-	delete histo;
-	delete output;
-}
-
-void DarkMatterDistribution::Fill(TBranch* branch, int nentries)
+void DarkMatterDistribution::Analyze(const std::string& filen)
 {
 	if(!attribute){std::cout << "Tried to fill histogram with invalid attribute.\n";}
 	TClonesArray* array = new TClonesArray("TRootLHEFParticle", 5);
@@ -232,7 +297,7 @@ void DarkMatterDistribution::Fill(TBranch* branch, int nentries)
 	delete array;
 }
 
-void DarkMatterDistribution::Save()
+void DarkMatterDistribution::UnInit()
 {
 	output->Write(); 
 }
@@ -241,10 +306,27 @@ void DarkMatterDistribution::Save()
 ////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////
 
-void DetectorAnalysis::Fill(const std::string& filen, TBranch* branch, int nentries)
+DetectorAnalysis::DetectorAnalysis()
+{
+}
+
+ROOTAnalysis* DetectorAnalysis::create()
+{
+	return new DetectorAnalysis();
+}
+
+DetectorAnalysis::~DetectorAnalysis()
+{
+}
+
+void DetectorAnalysis::Init()
+{
+}
+
+void DetectorAnalysis::Analyze(const std::string& filen)
 {
 	double vpmass, chimass, kappa, alpha;
-	if(getDMParameters(filen, vpmass, chimass, kappa, alpha)) return;
+	if(DMParameters(filen, vpmass, chimass, kappa, alpha)) return;
 	
 	const double emass = 0.000511;
 	
@@ -310,52 +392,8 @@ void DetectorAnalysis::Fill(const std::string& filen, TBranch* branch, int nentr
 	delete array;
 }
 
-void DetectorAnalysis::Save()
+void DetectorAnalysis::UnInit()
 {
 
 }
-
-
-/*
-std::string particle_names[5] = {"Pqd","Pqd1","Chi","Chi bar","V"}; 
-for(int i = 2; i<4; ++i)
-{
-std::string pxname = "X Momentum" + params;
-std::string pyname = "Y Momentum " + params;
-std::string pzname = "Z momentum " + params;
-std::string thetaname = "Theta " + params;
-std::string ename = "Energy " + params;
-
-std::stringstream numstr;
-numstr << i;
-
-particle_hists[i].px = new TH1D((pxname+numstr.str()).c_str(), pxname.c_str(), 100, -2.5, 2.5);
-particle_hists[i].py = new TH1D((pyname+numstr.str()).c_str(), pyname.c_str(), 100, -2.5, 2.5);
-particle_hists[i].pz = new TH1D((pzname+numstr.str()).c_str(), pzname.c_str(), 100, -70.0, 0.0);
-particle_hists[i].theta = new TH1D((thetaname+numstr.str()).c_str(), thetaname.c_str(), 100, -3.2, 3.2);
-particle_hists[i].e = new TH1D((ename+numstr.str()).c_str(), ename.c_str(), 100, 0.0, 60.0);
-
-particle_hists[i].px->SetLineColor(i);
-particle_hists[i].px->SetMarkerSize(0.8);
-particle_hists[i].px->SetStats(0);
-particle_hists[i].py->SetLineColor(i);
-particle_hists[i].py->SetMarkerSize(0.8);
-particle_hists[i].py->SetStats(0);
-particle_hists[i].pz->SetLineColor(i);
-particle_hists[i].pz->SetMarkerSize(0.8);
-particle_hists[i].pz->SetStats(0);
-particle_hists[i].theta->SetLineColor(i);
-particle_hists[i].theta->SetMarkerSize(0.8);
-particle_hists[i].theta->SetStats(0);
-particle_hists[i].e->SetLineColor(i);
-particle_hists[i].e->SetMarkerSize(0.8);
-particle_hists[i].e->SetStats(0);
-}
-*/
-
-/*histograms->px->Fill(particle->Px);
-histograms->py->Fill(particle->Py);
-histograms->pz->Fill(particle->Pz);
-histograms->theta->Fill(particle->Phi);
-histograms->e->Fill(particle->E);*/
 			
