@@ -351,7 +351,7 @@ void DetectorAnalysis::Analyze(const std::string& filen)
 	Particle electron2(emass);
 	
 	Kinematics kin;	
-	detector det;
+	DUNEDetector det;
 	DMscattering scatter;
 	
 	int scatterCount = 0;

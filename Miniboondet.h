@@ -1,7 +1,7 @@
 #pragma once
 // class detector
 class Particle;
-class DUNEDetector {
+class MiniBoonDetector {
 
 	double theta;
 public:
