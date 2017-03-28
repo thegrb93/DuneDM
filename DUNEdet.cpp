@@ -1,52 +1,69 @@
 #include <cmath>
+#include <algorithm>
 
 #include "DUNEdet.h"
 #include "Particle.h"
-#include "Kinematics.h"
 
-bool intersectAABB(float x, float y, float z, float dirx, float diry, float dirz, float minsx, float minsy, float minsz, float maxsx, float maxsy, float maxsz, float &t) const
+static bool RaySlabIntersect(double slabmin, double slabmax, double raystart, double raydir, double& tbenter, double& tbexit)
 {
-	float invdirx = 1/dirx, invdiry = 1/diry, invdirz = 1/dirz;
-	int sign[3];
-	sign[0] = (invdirx < 0);
-	sign[1] = (invdiry < 0);
-	sign[2] = (invdirz < 0);
-	
-	float tmin, tmax, tymin, tymax, tzmin, tzmax;
+    // ray parallel to the slab
+    if (fabs(raydir) < 1.0E-9f)
+    {
+        // ray parallel to the slab, but ray not inside the slab planes
+        if(raystart < slabmin || raystart > slabmax)
+        {
+            return false;
+        }
+            // ray parallel to the slab, but ray inside the slab planes
+        else
+        {
+            return true;
+        }
+    }
 
-	tmin = (bounds[r.sign[0]].x - r.orig.x) * r.invdir.x;
-	tmax = (bounds[1-r.sign[0]].x - r.orig.x) * r.invdir.x;
-	tymin = (bounds[r.sign[1]].y - r.orig.y) * r.invdir.y;
-	tymax = (bounds[1-r.sign[1]].y - r.orig.y) * r.invdir.y;
+    // slab's enter and exit parameters
+    double tsenter = (slabmin - raystart) / raydir;
+    double tsexit = (slabmax - raystart) / raydir;
 
-	if ((tmin > tymax) || (tymin > tmax))
-	return false;
+    // order the enter / exit values.
+    if(tsenter > tsexit)
+    {
+        double temp = tsexit;
+        tsexit = tsenter;
+        tsenter = temp;
+    }
 
-	if (tymin > tmin)
-	tmin = tymin;
-	if (tymax < tmax)
-	tmax = tymax;
+    // make sure the slab interval and the current box intersection interval overlap
+    if (tbenter > tsexit || tsenter > tbexit)
+    {
+        // nope. Ray missed the box.
+        return false;
+    }
+        // yep, the slab and current intersection interval overlap
+    else
+    {
+        // update the intersection interval
+        tbenter = std::max(tbenter, tsenter);
+        tbexit = std::min(tbexit, tsexit);
+        return true;
+    }
+}
 
-	tzmin = (bounds[r.sign[2]].z - r.orig.z) * r.invdir.z;
-	tzmax = (bounds[1-r.sign[2]].z - r.orig.z) * r.invdir.z;
-
-	if ((tmin > tzmax) || (tzmin > tmax))
-	return false;
-
-	if (tzmin > tmin)
-	tmin = tzmin;
-	if (tzmax < tmax)
-	tmax = tzmax;
-
-	t = tmin;
-
-	if (t < 0) {
-	t = tmax;
-	if (t < 0) return false;
-	}
-
-	return true;
-} 
+static bool intersectAABB(double x, double y, double z,
+                   double dirx, double diry, double dirz,
+                   double minsx, double minsy, double minsz,
+                   double maxsx, double maxsy, double maxsz, double &tenter, double& texit)
+{
+    tenter = 0;
+    texit = std::numeric_limits<double>::max();
+    if (!RaySlabIntersect(minsx, maxsx, x, dirx, tenter, texit))
+        return false;
+    if (!RaySlabIntersect(minsy, maxsy, y, diry, tenter, texit))
+        return false;
+    if (!RaySlabIntersect(minsz, maxsz, z, dirz, tenter, texit))
+        return false;
+    return true;
+}
 
 
 // polar angle measured from center of detector at which DM enters
@@ -64,7 +81,7 @@ double DUNEDetector::thetaenter (double theta) {
 	root = (-Bdet+sqrt(rad))/(2*Adet);
 	rthetaenter = acos(root);}
         else
-        rthetaenter=0.0; 
+        rthetaenter=0.0;
         
 	return(rthetaenter);
 }
@@ -106,28 +123,33 @@ double DUNEDetector::Lexit (double theta) {
 	return(rLexit);
 }
 // distance DM travels through detector
-double DUNEDetector::Ldet (double theta) {
-	double rLdet;
-	double Ldetenter, Ldetexit;
-	Ldetenter = Lenter(theta); 
-	Ldetexit = Lexit(theta); 
-        //std::cout<<"Lenter"<<Ldetenter<<"Lexit"<<Ldetexit<<std::endl;
-	rLdet = Ldetexit - Ldetenter;
-	return(rLdet);
+double DUNEDetector::Ldet (Particle &DM) {
+    double pLen = sqrt(DM.px*DM.px+DM.py*DM.py+DM.pz*DM.pz);
+    double tmin = 0, tmax = 0;
+    if(intersectAABB(0, 0, 0, DM.px/pLen, DM.py/pLen, DM.pz/pLen, minsx, minsy, minsz, maxsx, maxsy, maxsz, tmin, tmax))
+    {
+        return tmax - tmin;
+    }
 }
 //
 void DUNEDetector::intersect(int &dswitch, int &Ndm, Particle &DM){
-	// compute polar angle
-	double thetacut = 0.0128;	
-	double polarX;
-	Kinematics kin;
-        
-	polarX = kin.theta(DM.px,DM.py,DM.pz,DM.E);
-       // std::cout<<"Polar X is"<<polarX<<std::endl;
-	// check if dark matter intersects detector
-	if (polarX < thetacut) 
+	double pLen = sqrt(DM.px*DM.px+DM.py*DM.py+DM.pz*DM.pz);
+    double tmin = 0, tmax = 0;
+    if(intersectAABB(0, 0, 0, DM.px/pLen, DM.py/pLen, DM.pz/pLen, minsx, minsy, minsz, maxsx, maxsy, maxsz, tmin, tmax))
 	{
 		dswitch = 1;
 		Ndm = Ndm+1;
 	}		
+}
+
+DUNEDetector::DUNEDetector():
+posx(0), posy(0), posz(500)
+{
+    double width = 3.5, height = 3.5, depth = 6.4;
+    minsx = posx - width/2;
+    maxsx = posx + width/2;
+    minsy = posy - height/2;
+    maxsy = posy + height/2;
+    minsz = posz - depth/2;
+    maxsz = posz + depth/2;
 }

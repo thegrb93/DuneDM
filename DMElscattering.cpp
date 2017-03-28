@@ -95,13 +95,11 @@ void DMscattering::probscatter (int &dswitch, int &Nscat, double &pMax, double M
 	convGeV2cm2 = 3.89e-28;
 	convmcm = 100.0;
 	pscat = Random::Flat(0,1);
-	Kinematics kin;
-	detector det;
-	if (dswitch == 1) 
+	DUNEDetector det;
+	if (dswitch == 1)
 	{
-		thetaX = kin.theta(DM.px,DM.py,DM.pz,DM.E);
-                //std::cout<<"thetaX"<<thetaX<<std::endl;			
-		LXdet = det.Ldet(thetaX);
+                //std::cout<<"thetaX"<<thetaX<<std::endl;
+		LXdet = det.Ldet(DM);
                 //std::cout<<"LXdet  =  "<<LXdet<<"theta=  "<<thetaX<<"momentum are"<<DM.px<<"\t"<<DM.py<<"\t"<<DM.pz<<"\t"<<DM.E<< std::endl;	
 		LXdet = LXdet*convmcm;
 		XS = sigma(DM.E,MDM,MDP,kap,alD);
@@ -138,10 +136,10 @@ void DMscattering::scatterevent (int &dswitch, int &Nelec, double MDP, double MD
 	double probe, Re;
 	int eswitch;
         //std::cout <<"value is" << pex <<"\t"<< pey <<"\t"<< pez <<"\t"<< Ee <<std::endl;
-	if (dswitch == 2) 
+	if (dswitch == 2)
 	{
 
-                
+
 		eswitch = 0;
 		EeMax = EeTMax(DM.E,MDM);
 		EeMin = EeTMin(DM.E,MDM);
