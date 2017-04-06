@@ -325,7 +325,13 @@ void DetectorAnalysis::Init()
 		detectorType = gOptions[OPT_DETECTOR].last()->arg;
 	else
 		detectorType = "LArTPC";
-	
+
+    if(detectorType=="DUNE")
+    {
+        smear_mean = 0;
+        smear_sigma = 0.06;
+    }
+
 	if(gOptions[OPT_DET_SMEAR_SIG])
 		smear_sigma = toDouble(gOptions[OPT_DET_SMEAR_SIG].last()->arg);
 	else
@@ -376,13 +382,6 @@ void DetectorAnalysis::Analyze(const std::string& filen)
 			TRootLHEFParticle* particle = (TRootLHEFParticle*)array->At(j);
 			if(particle->PID==33)
 			{
-				if(smear_sigma>0)
-				{
-					particle->Px += Random::Gauss(smear_mean, smear_sigma);
-					particle->Py += Random::Gauss(smear_mean, smear_sigma);
-					particle->Pz += Random::Gauss(smear_mean, smear_sigma);
-					particle->E += Random::Gauss(smear_mean, smear_sigma);
-				}
 				darkmatter1.FourMomentum(particle->Px,particle->Py,-particle->Pz,particle->E);
 				
 				int DMSwitch = 0;
@@ -391,6 +390,12 @@ void DetectorAnalysis::Analyze(const std::string& filen)
 				scatter.scatterevent(DMSwitch,Nelectron,vpmass,chimass,kappa,alpha,darkmatter1,electron1);
 				if(DMSwitch == 2)
 				{
+                    if(smear_sigma>0)
+                    {
+                        darkmatter1.E += Random::Gauss(smear_mean, smear_sigma/sqrt(darkmatter1.E));
+                        electron1.E += Random::Gauss(smear_mean, smear_sigma/sqrt(electron1.E));
+                    }
+
 					dmpz->Fill(darkmatter1.pz);
 					dme->Fill(darkmatter1.E);
 					epz->Fill(electron1.pz);

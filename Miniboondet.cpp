@@ -1,6 +1,6 @@
 #include <cmath>
 
-#include "DUNEdet.h"
+#include "Miniboondet.h"
 #include "Particle.h"
 #include "Kinematics.h"
 
