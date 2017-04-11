@@ -24,6 +24,7 @@ double DMscattering::EeTMax (double EDM, double MDM) {
 	double rEeTMax;
 	double ThetaelMax = 0.0;
 	rEeTMax = EeTheta(EDM,ThetaelMax,MDM);
+        //std::cout<<"Eemax"<<rEeTMax<<std::endl;
 	return(rEeTMax);
 }
 // Minimum electron energy as a function of 
@@ -33,6 +34,7 @@ double DMscattering::EeTMin (double EDM, double MDM) {
 	double Pi = 3.141592653589793;
 	double ThetaelMin = Pi/2.0;
 	rEeTMin = EeTheta(EDM,ThetaelMin,MDM);
+        std::cout<<"Eemin "<<rEeTMin<<std::endl;
 	return(rEeTMin);
 }
 // Function F1
@@ -83,49 +85,49 @@ double DMscattering::sigma (double EDM, double MDM, double MDP, double kappa, do
 	return(rsig);
 }
 //
-void DMscattering::probscatter (int &dswitch, int &Nscat, double &pMax, double MDP, double MDM, double kap, double alD, Particle &DM) {
-	double thetaX;
+void DMscattering::probscatter (int &dswitch, int &Nscat, double &pMax, double MDP, double MDM, double kap, double alD, Particle& DM) {
 	double pscat, Rscat;	
 	double LXdet, XS;
 	double prob;
-	//pMax = 1.0e-15;	
+	double pMax0 = 1.0e-10;	
 	double ne = 5.1e+23;
 	//int Nscatter;	
 	double convmcm, convGeV2cm2;
 	convGeV2cm2 = 3.89e-28;
 	convmcm = 100.0;
 	pscat = Random::Flat(0,1);
+	Kinematics kin;
 	DUNEDetector det;
-	if (dswitch == 1)
+	if (dswitch == 1) 
 	{
-                //std::cout<<"thetaX"<<thetaX<<std::endl;
+                			
 		LXdet = det.Ldet(DM);
-                //std::cout<<"LXdet  =  "<<LXdet<<"theta=  "<<thetaX<<"momentum are"<<DM.px<<"\t"<<DM.py<<"\t"<<DM.pz<<"\t"<<DM.E<< std::endl;	
 		LXdet = LXdet*convmcm;
 		XS = sigma(DM.E,MDM,MDP,kap,alD);
 		XS = XS*convGeV2cm2;
-               // std::cout<<"cross section is"<<XS<<std::endl;
+                std::cout<<DM.E<<"\t"<<(XS*pow(10,39))<<std::endl;
+               
 		prob = XS*ne*LXdet;
                 
-		if (prob > pMax) 
+		if (prob > pMax0) 
 		{
 			pMax = prob;
-	//		cout << pMax << endl;
+			
 		}
-		Rscat = prob/pMax; 
-                std::cout<<"prob are"<<prob<<"\t"<<Rscat<<"\t"<<pscat<<std::endl;
+		Rscat = prob/pMax0; 
+                
 		if (Rscat > pscat) 
 		{
 			Nscat = Nscat+1;
 			dswitch = 2;
-                       std::cout<<"dswitch"<<dswitch<<std::endl;
+                       
 		}
 	}
 	
 	
 }
 //
-void DMscattering::scatterevent (int &dswitch, int &Nelec, double MDP, double MDM, double kap, double alD, Particle &DM, Particle &electron) {
+void DMscattering::scatterevent (int &dswitch, int &Nelec, double MDP, double MDM, double kap, double alD, Particle& DM, Particle &electron) {
 	double Pi = 3.141592653589793;
 	double Me = 0.000511;
 	double EeMin, EeMax;
@@ -136,10 +138,10 @@ void DMscattering::scatterevent (int &dswitch, int &Nelec, double MDP, double MD
 	double probe, Re;
 	int eswitch;
         //std::cout <<"value is" << pex <<"\t"<< pey <<"\t"<< pez <<"\t"<< Ee <<std::endl;
-	if (dswitch == 2)
+	if (dswitch == 2) 
 	{
 
-
+                
 		eswitch = 0;
 		EeMax = EeTMax(DM.E,MDM);
 		EeMin = EeTMin(DM.E,MDM);
@@ -152,8 +154,8 @@ void DMscattering::scatterevent (int &dswitch, int &Nelec, double MDP, double MD
 			probe = Random::Flat(0,1);		
 			xe = Random::Flat(0,1);
 			Thetae = xe*Pi;
-			Ee = EeTheta (DM.E,Thetae,MDM);
-			//Ee = EeMin + xEe*(EeMax-EeMin);
+			
+			Ee = EeMin + xe*(EeMax-EeMin);
 			dsig = dsigmadEe(Ee,DM.E,MDM,MDP,kap,alD);
 			psig = (EeMax-EeMin)*dsig/sig;
 			Re = psig/psigMax;
