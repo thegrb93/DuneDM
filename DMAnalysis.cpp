@@ -341,6 +341,8 @@ void DetectorAnalysis::Init()
 		smear_mean = toDouble(gOptions[OPT_DET_SMEAR_MEAN].last()->arg);
 	else
 		smear_mean = 0;
+	
+	smear_sigma = 0.06;
 }
 
 void DetectorAnalysis::Analyze(const std::string& filen)
@@ -366,10 +368,16 @@ void DetectorAnalysis::Analyze(const std::string& filen)
 	double probMax = 10e-15;
 	
 	TFile* output = new TFile("output.root", "RECREATE");
-	TH1D* dmpz = new TH1D("dmpz","Dark matter Scatter P_{z};P_{z} (GeV/c^{2})", 100, 0, 0);
-	TH1D* dme = new TH1D("dme","Dark matter Scatter E;E (GeV)", 100, 0, 0);
-	TH1D* epz = new TH1D("epz","Electron Scatter P_{z};P_{z} (GeV/c^{2})", 100, 0, 0);
-	TH1D* ee = new TH1D("ee","Electron Scatter E;E (GeV)", 100, 0, 0);
+	TH1D* dmpz_1 = new TH1D("dmpz1","Dark matter P_{z};P_{z} (GeV/c^{2})", 100, 0, 0);
+	TH1D* dme_1 = new TH1D("dme1","Dark matter E;E (GeV)", 100, 0, 0);
+	TH1D* dmpz_2 = new TH1D("dmpz2","Intersected Dark matter P_{z};P_{z} (GeV/c^{2})", 100, 0, 0);
+	TH1D* dme_2 = new TH1D("dme2","Intersected Dark matter E;E (GeV)", 100, 0, 0);
+	TH1D* dmpz_3 = new TH1D("dmpz3","Dark matter Scatter P_{z};P_{z} (GeV/c^{2})", 100, 0, 0);
+	TH1D* dme_3 = new TH1D("dme3","Dark matter Scatter E;E (GeV)", 100, 0, 0);
+	TH1D* epz_3 = new TH1D("epz3","Electron Scatter P_{z};P_{z} (GeV/c^{2})", 100, 0, 0);
+	TH1D* ee_3 = new TH1D("ee3","Electron Scatter E;E (GeV)", 100, 0, 0);
+	TH1D* dme_4 = new TH1D("dme4","Dark matter Smeared Scatter E;E (GeV)", 100, 0, 0);
+	TH1D* ee_4 = new TH1D("ee4","Electron Smeared Scatter E;E (GeV)", 100, 0, 0);
 	
 	TClonesArray* array = new TClonesArray("TRootLHEFParticle", 5);
 	branch->SetAddress(&array);
@@ -382,38 +390,61 @@ void DetectorAnalysis::Analyze(const std::string& filen)
 			TRootLHEFParticle* particle = (TRootLHEFParticle*)array->At(j);
 			if(particle->PID==33)
 			{
+				dmpz_1->Fill(-particle->Pz);
+				dme_1->Fill(particle->E);
+				
 				darkmatter1.FourMomentum(particle->Px,particle->Py,-particle->Pz,particle->E);
 				
 				int DMSwitch = 0;
 				det.intersect(DMSwitch,scatterCount,darkmatter1);
+				if(DMSwitch == 1)
+				{
+					dmpz_2->Fill(-particle->Pz);
+					dme_2->Fill(particle->E);
+				}
 				scatter.probscatter(DMSwitch,Nscatter,probMax,vpmass,chimass,kappa,alpha,darkmatter1);
 				scatter.scatterevent(DMSwitch,Nelectron,vpmass,chimass,kappa,alpha,darkmatter1,electron1);
 				if(DMSwitch == 2)
 				{
+					dmpz_3->Fill(darkmatter1.pz);
+					dme_3->Fill(darkmatter1.E);
+					epz_3->Fill(electron1.pz);
+					ee_3->Fill(electron1.E);
+					
                     if(smear_sigma>0)
                     {
                         darkmatter1.E += Random::Gauss(smear_mean, smear_sigma/sqrt(darkmatter1.E));
                         electron1.E += Random::Gauss(smear_mean, smear_sigma/sqrt(electron1.E));
                     }
 
-					dmpz->Fill(darkmatter1.pz);
-					dme->Fill(darkmatter1.E);
-					epz->Fill(electron1.pz);
-					ee->Fill(electron1.E);
+					dme_4->Fill(darkmatter1.E);
+					ee_4->Fill(electron1.E);
 				}	
 			}
 		}
 	}
-	dmpz->BufferEmpty();
-	dme->BufferEmpty();
-	epz->BufferEmpty();
-	ee->BufferEmpty();
+	dmpz_1->BufferEmpty();
+	dme_1->BufferEmpty();
+	dmpz_2->BufferEmpty();
+	dme_2->BufferEmpty();
+	dmpz_3->BufferEmpty();
+	dme_3->BufferEmpty();
+	epz_3->BufferEmpty();
+	ee_3->BufferEmpty();
+	dme_4->BufferEmpty();
+	ee_4->BufferEmpty();
 	output->Write();
 	
-	delete dmpz;
-	delete dme;
-	delete epz;
-	delete ee;
+	delete dmpz_1;
+	delete dme_1;
+	delete dmpz_2;
+	delete dme_2;
+	delete dmpz_3;
+	delete dme_3;
+	delete epz_3;
+	delete ee_3;
+	delete dme_4;
+	delete ee_4;
 	delete output;
 	delete array;
 }
@@ -422,4 +453,3 @@ void DetectorAnalysis::UnInit()
 {
 
 }
-			
