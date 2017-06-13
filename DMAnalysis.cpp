@@ -9,6 +9,7 @@
 #include <TFile.h>
 #include <TTree.h>
 #include <TH2D.h>
+#include <TF1.h>
 #include <TChain.h>
 #include <TGraph2D.h>
 #include <TLegend.h>
@@ -326,11 +327,11 @@ void DetectorAnalysis::Init()
 	else
 		detectorType = "LArTPC";
 
-    if(detectorType=="DUNE")
-    {
-        smear_mean = 0;
-        smear_sigma = 0.06;
-    }
+	if(detectorType=="DUNE")
+	{
+		smear_mean = 0;
+		smear_sigma = 0.06;
+	}
 
 	if(gOptions[OPT_DET_SMEAR_SIG])
 		smear_sigma = toDouble(gOptions[OPT_DET_SMEAR_SIG].last()->arg);
@@ -378,6 +379,8 @@ void DetectorAnalysis::Analyze(const std::string& filen)
 	TH1D* ee_3 = new TH1D("ee3","Electron Scatter E;E (GeV)", 100, 0, 0);
 	TH1D* dme_4 = new TH1D("dme4","Dark matter Smeared Scatter E;E (GeV)", 100, 0, 0);
 	TH1D* ee_4 = new TH1D("ee4","Electron Smeared Scatter E;E (GeV)", 100, 0, 0);
+	TH1D* dme_5 = new TH1D("dme5","Dark matter Scatter Energy Smearing Ratio;E (GeV)", 100, 0, 0);
+	TH1D* ee_5 = new TH1D("ee5","Electron Scatter Energy Smearing Ratio;E (GeV)", 40, 0, 2);
 	
 	TClonesArray* array = new TClonesArray("TRootLHEFParticle", 5);
 	branch->SetAddress(&array);
@@ -408,18 +411,26 @@ void DetectorAnalysis::Analyze(const std::string& filen)
 				{
 					dmpz_3->Fill(darkmatter1.pz);
 					dme_3->Fill(darkmatter1.E);
-					epz_3->Fill(electron1.pz);
-					ee_3->Fill(electron1.E);
 					
-                    if(smear_sigma>0)
-                    {
-                        darkmatter1.E += Random::Gauss(smear_mean, smear_sigma/sqrt(darkmatter1.E));
-                        electron1.E += Random::Gauss(smear_mean, smear_sigma/sqrt(electron1.E));
-                    }
-
-					dme_4->Fill(darkmatter1.E);
-					ee_4->Fill(electron1.E);
-				}	
+					bool thresh = electron1.E < 0.5;
+					epz_3->Fill(electron1.pz);
+					if(thresh) ee_3->Fill(electron1.E);
+					
+					double darkmatter1E = darkmatter1.E;
+					double electron1E = electron1.E;
+					
+					if(smear_sigma>0)
+					{
+						darkmatter1.E += Random::Gauss(smear_mean, smear_sigma/sqrt(darkmatter1.E));
+						electron1.E += Random::Gauss(smear_mean, smear_sigma/sqrt(electron1.E));
+						
+						dme_4->Fill(darkmatter1.E);
+						if(thresh) ee_4->Fill(electron1.E);
+						
+						dme_5->Fill(darkmatter1.E / darkmatter1E);
+						if(thresh) ee_5->Fill(electron1.E / electron1E);
+					}
+				}
 			}
 		}
 	}
@@ -433,6 +444,21 @@ void DetectorAnalysis::Analyze(const std::string& filen)
 	ee_3->BufferEmpty();
 	dme_4->BufferEmpty();
 	ee_4->BufferEmpty();
+	dme_5->BufferEmpty();
+	ee_5->BufferEmpty();
+	
+	double parx[3] = {1,1,1};
+	//TF1 *gx = new TF1("gx","gaus(0)",0.999,1.001);
+	TF1 *gx = new TF1("gx","gaus(0)",dme_5->GetXaxis()->GetXmin(),dme_5->GetXaxis()->GetXmax());
+	gx->SetParameters(parx);
+	dme_5->Fit(gx,"R");
+	
+	double pare[3] = {1,1,1};
+	//TF1 *ge = new TF1("ge","gaus(0)",0.8,1.2);
+	TF1 *ge = new TF1("ge","gaus(0)",ee_5->GetXaxis()->GetXmin(),ee_5->GetXaxis()->GetXmax());
+	ge->SetParameters(pare);
+	ee_5->Fit(ge,"R");
+	
 	output->Write();
 	
 	delete dmpz_1;

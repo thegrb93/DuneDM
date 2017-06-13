@@ -47,7 +47,7 @@ int main (int argc, char** argv)
 	if(parse.nonOptionsCount()>0)
 	{
 		std::string mode;
-		if(options[OPT_MODE])
+		if(options[OPT_MODE] && options[OPT_MODE].last()->arg)
 			mode = std::string(options[OPT_MODE].last()->arg);
 		else
 			mode = "detector";
