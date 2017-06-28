@@ -18,5 +18,9 @@ public:
 	double sigma (double,double,double,double,double);
 	void probscatter(int &,int &,double &,double,double,double,double,Particle&);
 	void scatterevent(int &,int &,double,double,double,double,Particle&,Particle &);
+	void probscatterNeutrino(int &dswitch, int &Nscat, double &pMax, std::vector<double> &energies,
+                             std::vector<double> &xsections, Particle &DM);
+
+	void scattereventNeutrino(int &dswitch, int &Nelec, double MDM, Particle &DM, Particle &electron);
 };
 

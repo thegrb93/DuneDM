@@ -2,13 +2,10 @@
 #include <string>
 #include <vector>
 #include <TROOT.h>
-#include "optionparser.h"
 
 enum optionIndex {
 OPT_UNKNOWN, OPT_HELP, OPT_MODE, OPT_PARTICLE, OPT_PARTICLEATTRIBUTE,
 OPT_DETECTOR, OPT_DET_SMEAR_SIG, OPT_DET_SMEAR_MEAN};
-
-extern option::Option* gOptions;
 
 
 class TFile;

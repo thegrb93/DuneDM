@@ -1,5 +1,6 @@
 #include <iostream>
 #include <cmath>
+#include <vector>
 
 #include "DMElscattering.h"
 #include "Particle.h"
@@ -86,10 +87,10 @@ double DMscattering::sigma (double EDM, double MDM, double MDP, double kappa, do
 }
 //
 void DMscattering::probscatter (int &dswitch, int &Nscat, double &pMax, double MDP, double MDM, double kap, double alD, Particle& DM) {
-	double pscat, Rscat;	
+	double pscat, Rscat;
 	double LXdet, XS;
 	double prob;
-	double pMax0 = 1.0e-10;	
+	double pMax0 = 1.0e-10;
 	double ne = 5.1e+23;
 	//int Nscatter;	
 	double convmcm, convGeV2cm2;
@@ -98,80 +99,178 @@ void DMscattering::probscatter (int &dswitch, int &Nscat, double &pMax, double M
 	pscat = Random::Flat(0,1);
 	Kinematics kin;
 	DUNEDetector det;
-	if (dswitch == 1) 
+	if (dswitch == 1)
 	{
-                			
+
 		LXdet = det.Ldet(DM);
 		LXdet = LXdet*convmcm;
 		XS = sigma(DM.E,MDM,MDP,kap,alD);
 		XS = XS*convGeV2cm2;
-                std::cout<<DM.E<<"\t"<<(XS*pow(10,39))<<std::endl;
-               
+		//std::cout<<DM.E<<"\t"<<(XS*pow(10,39))<<std::endl;
+
 		prob = XS*ne*LXdet;
-                
-		if (prob > pMax0) 
+
+		if (prob > pMax0)
 		{
 			pMax = prob;
-			
+
 		}
-		Rscat = prob/pMax0; 
-                
-		if (Rscat > pscat) 
+		Rscat = prob/pMax0;
+
+		if (Rscat > pscat)
 		{
 			Nscat = Nscat+1;
 			dswitch = 2;
-                       
+
 		}
 	}
-	
-	
+
+
+}
+
+void DMscattering::probscatterNeutrino (int &dswitch, int &Nscat, double &pMax, std::vector<double>& energies, std::vector<double>& xsections, Particle& DM) {
+	double pscat, Rscat;
+	double LXdet, XS;
+	double prob;
+	double pMax0 = 1.0e-10;
+	double ne = 5.1e+23;
+	//int Nscatter;
+	double convmcm, convGeV2cm2;
+	convGeV2cm2 = 1e-46;
+	convmcm = 100.0;
+	pscat = Random::Flat(0,1);
+	Kinematics kin;
+	DUNEDetector det;
+	if (dswitch == 1)
+	{
+
+		LXdet = det.Ldet(DM);
+		LXdet = LXdet*convmcm;
+        XS = -1;
+        if(DM.E >= energies[0])
+		    for(int i = 1; i<energies.size(); ++i)
+                if(DM.E <= energies[i])
+                {
+                    XS = (DM.E - energies[i-1])/(energies[i] - energies[i-1])*(xsections[i]-xsections[i-1])+xsections[i-1];
+                }
+        if(XS < 0) return;
+		XS = XS*convGeV2cm2;
+		//std::cout<<DM.E<<"\t"<<(XS*pow(10,39))<<std::endl;
+
+		prob = XS*ne*LXdet;
+
+		if (prob > pMax0)
+		{
+			pMax = prob;
+
+		}
+		Rscat = prob/pMax0;
+
+		if (Rscat > pscat)
+		{
+			Nscat = Nscat+1;
+			dswitch = 2;
+
+		}
+	}
+
+
 }
 //
 void DMscattering::scatterevent (int &dswitch, int &Nelec, double MDP, double MDM, double kap, double alD, Particle& DM, Particle &electron) {
-	double Pi = 3.141592653589793;
-	double Me = 0.000511;
-	double EeMin, EeMax;
-	double xe, ye, Thetae, Phie, Ee;
-	double pe, pex, pey, pez;
-	double dsig, sig, psig;
-	double dsigMax, psigMax;
-	double probe, Re;
-	int eswitch;
-        //std::cout <<"value is" << pex <<"\t"<< pey <<"\t"<< pez <<"\t"<< Ee <<std::endl;
-	if (dswitch == 2) 
-	{
+    double Pi = 3.141592653589793;
+    double Me = 0.000511;
+    double EeMin, EeMax;
+    double xe, ye, Thetae, Phie, Ee;
+    double pe, pex, pey, pez;
+    double dsig, sig, psig;
+    double dsigMax, psigMax;
+    double probe, Re;
+    int eswitch;
+    //std::cout <<"value is" << pex <<"\t"<< pey <<"\t"<< pez <<"\t"<< Ee <<std::endl;
+    if (dswitch == 2)
+    {
 
-                
-		eswitch = 0;
-		EeMax = EeTMax(DM.E,MDM);
-		EeMin = EeTMin(DM.E,MDM);
-		sig = sigma(DM.E,MDM,MDP,kap,alD);
-		dsigMax = dsigmadEe(EeMin,DM.E,MDM,MDP,kap,alD);
-		psigMax =(EeMax-EeMin)*dsigMax/sig;
-		
-		while (eswitch == 0) 
-		{
-			probe = Random::Flat(0,1);		
-			xe = Random::Flat(0,1);
-			Thetae = xe*Pi;
-			
-			Ee = EeMin + xe*(EeMax-EeMin);
-			dsig = dsigmadEe(Ee,DM.E,MDM,MDP,kap,alD);
-			psig = (EeMax-EeMin)*dsig/sig;
-			Re = psig/psigMax;
-			if (Re > probe) 
-			{
-				eswitch = 1;
-				ye = Random::Flat(0,1);
-				Phie = ye*2.0*Pi;
-				pe = sqrt(Ee*Ee-Me*Me);
-				pex = pe*sin(Thetae)*cos(Phie);
-				pey = pe*sin(Thetae)*sin(Phie);
-				pez = pe*cos(Thetae);
-				electron.FourMomentum(pex,pey,pez,Ee);
-				Nelec = Nelec+1;
-				
-			}	
-		}
-	}
+
+        eswitch = 0;
+        EeMax = EeTMax(DM.E,MDM);
+        EeMin = EeTMin(DM.E,MDM);
+        sig = sigma(DM.E,MDM,MDP,kap,alD);
+        dsigMax = dsigmadEe(EeMin,DM.E,MDM,MDP,kap,alD);
+        psigMax =(EeMax-EeMin)*dsigMax/sig;
+
+        while (eswitch == 0)
+        {
+            probe = Random::Flat(0,1);
+            xe = Random::Flat(0,1);
+            Thetae = xe*Pi;
+
+            Ee = EeMin + xe*(EeMax-EeMin);
+            dsig = dsigmadEe(Ee,DM.E,MDM,MDP,kap,alD);
+            psig = (EeMax-EeMin)*dsig/sig;
+            Re = psig/psigMax;
+            if (Re > probe)
+            {
+                eswitch = 1;
+                ye = Random::Flat(0,1);
+                Phie = ye*2.0*Pi;
+                pe = sqrt(Ee*Ee-Me*Me);
+                pex = pe*sin(Thetae)*cos(Phie);
+                pey = pe*sin(Thetae)*sin(Phie);
+                pez = pe*cos(Thetae);
+                electron.FourMomentum(pex,pey,pez,Ee);
+                Nelec = Nelec+1;
+
+            }
+        }
+    }
 }
+//
+/*void DMscattering::scattereventNeutrino (int &dswitch, int &Nelec, double MDM, Particle& DM, Particle &electron) {
+    double Pi = 3.141592653589793;
+    double Me = 0.000511;
+    double EeMin, EeMax;
+    double xe, ye, Thetae, Phie, Ee;
+    double pe, pex, pey, pez;
+    double dsig, sig, psig;
+    double dsigMax, psigMax;
+    double probe, Re;
+    int eswitch;
+    //std::cout <<"value is" << pex <<"\t"<< pey <<"\t"<< pez <<"\t"<< Ee <<std::endl;
+    if (dswitch == 2)
+    {
+
+
+        eswitch = 0;
+        EeMax = EeTMax(DM.E,0);
+        EeMin = EeTMin(DM.E,0);
+        sig = sigma(DM.E,MDM,MDP,kap,alD);
+        dsigMax = dsigmadEe(EeMin,DM.E,MDM,MDP,kap,alD);
+        psigMax =(EeMax-EeMin)*dsigMax/sig;
+
+        while (eswitch == 0)
+        {
+            probe = Random::Flat(0,1);
+            xe = Random::Flat(0,1);
+            Thetae = xe*Pi;
+
+            Ee = EeMin + xe*(EeMax-EeMin);
+            dsig = dsigmadEe(Ee,DM.E,MDM,MDP,kap,alD);
+            psig = (EeMax-EeMin)*dsig/sig;
+            Re = psig/psigMax;
+            if (Re > probe)
+            {
+                eswitch = 1;
+                ye = Random::Flat(0,1);
+                Phie = ye*2.0*Pi;
+                pe = sqrt(Ee*Ee-Me*Me);
+                pex = pe*sin(Thetae)*cos(Phie);
+                pey = pe*sin(Thetae)*sin(Phie);
+                pez = pe*cos(Thetae);
+                electron.FourMomentum(pex,pey,pez,Ee);
+                Nelec = Nelec+1;
+
+            }
+        }
+    }
+}*/

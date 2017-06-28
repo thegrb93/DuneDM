@@ -2,55 +2,27 @@
 #include <iostream>
 #include <vector>
 #include <map>
+#include "cxxopts.hpp"
 #include "DMAnalysis.h"
 
-const option::Descriptor usage[] =
-{
-	{OPT_UNKNOWN, 0,"" , ""    ,option::Arg::None, "USAGE: DuneDM [options] files\n\n"
-		                                     "Options:" },
-	{OPT_HELP,    0,"h" , "help", option::Arg::None, "  --help, -h  \tPrint usage and exit." },
-	{OPT_MODE,    0,"", "mode", option::Arg::Optional, "  --mode  \tMode to use.\n"
-                                                       "statistics: Plots particle parameters with respect to masses.\nhistograms: Plots a distribution given a particle type and parameter.\ndetector: Simulates detector response and plots the distribution." },
-	{OPT_PARTICLE, 0,"" ,  "particle"   ,option::Arg::Optional, "  --particle  \tParticle pdgcode" },
-	{OPT_PARTICLEATTRIBUTE, 0, "", "attribute", option::Arg::Optional, "  --attribute  \tName of the attribute you want to plot;\nThis is for histogram mode."},
-	{OPT_DETECTOR, 0, "", "detector", option::Arg::Optional, "  --detector  \tName of the detector to use."},
-	{OPT_DET_SMEAR_SIG, 0, "", "smearsig", option::Arg::Optional, "  --smearsig  \tThe smearing sigma to use in the detector."},
-	{OPT_DET_SMEAR_MEAN, 0, "", "smearmean", option::Arg::Optional, "  --smearmean  \tThe smearing mean to use in the detector."},
-	{0,0,0,0,0,0}
-};
- 
-option::Option* gOptions;
+int main (int argc, char** argv) {
+	cxxopts::Options options("DuneDM", "USAGE: DuneDM [options] files");
+	options.add_options()
+            ("mode", "Which analysis mode to use. Can be 'statistics', 'histograms', or 'detector'.", cxxopts::value<std::string>(), "")
+            ("particle", "Particle pdgcode to analyze", cxxopts::value<int>(), "")
+            ("attribute", "The particle attribute to analyze", cxxopts::value<std::string>(), "")
+            ("detector", "Which detector type to use. Can be 'DUNE'.", cxxopts::value<std::string>(), "")
+            ("files","The root files to analyze", cxxopts::value<std::vector<std::string>>(), "");
+    options.parse_positional("files");
+	options.parse(argc, argv);
 
-int main (int argc, char** argv)
-{
-	if(argc<2){
-		option::printUsage(std::cout, usage);
-		return 0;
-	}
-	
-	option::Stats  stats(usage, argc-1, argv+1);
-	option::Option options[stats.options_max], buffer[stats.buffer_max];
-	option::Parser parse(usage, argc-1, argv+1, options, buffer);
-	gOptions = options;
-
-	if (parse.error())
-		return 1;
-
-	if (options[OPT_HELP]) {
-		option::printUsage(std::cout, usage);
-		return 0;
-	}
-
-	for (option::Option* opt = options[OPT_UNKNOWN]; opt; opt = opt->next())
-		std::cout << "Unknown option: " << opt->name << "\n";
-
-	if(parse.nonOptionsCount()>0)
-	{
+    const std::vector<std::string>& files = options["files"].as<std::vector<std::string>>();
+	if(files.size()>0) {
 		std::string mode;
-		if(options[OPT_MODE] && options[OPT_MODE].last()->arg)
-			mode = std::string(options[OPT_MODE].last()->arg);
-		else
-			mode = "detector";
+        try { mode = options["mode"].as<std::string>(); }
+        catch(...){ mode = "detector"; }
+        if(mode.empty())
+            mode = "detector";
 			
 		std::map<std::string,DMAnalysis*(*)()> modes = {
 			{"statisics", &StatisticsAnalysis::create},
@@ -59,13 +31,9 @@ int main (int argc, char** argv)
 		};
 
 		auto constructor = modes.find(mode);
-		if(constructor != modes.end())
-		{
+		if(constructor != modes.end()) {
 			DMAnalysis* analysis = (constructor->second)();
-			
-			for (int i = 0; i < parse.nonOptionsCount(); ++i)
-				analysis->files.push_back(parse.nonOption(i));
-			
+            analysis->files.assign(files.begin(), files.end());
 			analysis->Process();
 			delete analysis;
 		}
