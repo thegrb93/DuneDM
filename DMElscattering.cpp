@@ -48,7 +48,7 @@ double DMscattering::EeTMin (double EDM, double MDM) {
 	double Pi = 3.141592653589793;
 	double ThetaelMin = Pi/2.0;
 	rEeTMin = EeTheta(EDM,ThetaelMin,MDM);
-        std::cout<<"Eemin "<<rEeTMin<<std::endl;
+    //std::cout<<"Eemin "<<rEeTMin<<std::endl;
 	return(rEeTMin);
 }
 // Function F1
@@ -258,8 +258,9 @@ void DMscattering::scatterevent (int &dswitch, int &Nelec, double MDP, double MD
     }
 }
 //
-void DMscattering::scattereventNeutrino (int &dswitch, int &Nelec, double MDM, Particle& DM, Particle &electron) {
+void DMscattering::scattereventNeutrino (int &dswitch, int &Nelec, Particle& DM, Particle &electron) {
     double Pi = 3.141592653589793;
+    double convGeV2cm2 = 1e-46;
     double Me = 0.000511;
     double EeMin, EeMax;
     double xe, ye, Thetae, Phie, Ee;
@@ -274,8 +275,16 @@ void DMscattering::scattereventNeutrino (int &dswitch, int &Nelec, double MDM, P
         eswitch = 0;
         EeMax = 2*Me*DM.E*DM.E / (std::pow(Me + DM.E, 2) - DM.E*DM.E);
         EeMin = 0;
-        sig = nuSigma(DM.E);
+        sig = nuSigma(DM.E) * convGeV2cm2;
+        if(sig<0) return;
         dsigMax = nudSigmadEe(DM.E, 0);
+
+        const double step = 0.01;
+        double numericalSigma = 0;
+        for(double t = 0; t<=Pi/2; t+=step)
+            numericalSigma += nudSigmadEe(DM.E, t)*step;
+        std::cout << "Sigma: " << sig << "    NumericalSigma: " << numericalSigma << std::endl;
+
         psigMax =(EeMax-EeMin)*dsigMax/sig;
 
         while (eswitch == 0)
@@ -298,8 +307,6 @@ void DMscattering::scattereventNeutrino (int &dswitch, int &Nelec, double MDM, P
                 pey = pe*sin(Thetae)*sin(Phie);
                 pez = pe*cos(Thetae);
                 electron.FourMomentum(pex,pey,pez,Ee);
-                Nelec = Nelec+1;
-
             }
         }
     }

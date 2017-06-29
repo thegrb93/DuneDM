@@ -344,12 +344,6 @@ void DetectorAnalysis::Analyze(const std::string& filen)
 	if(DMParameters(filen, vpmass, chimass, kappa, alpha)) return;
 	
 	const double emass = 0.000511;
-	
-	Particle darkphoton(vpmass);
-	Particle darkmatter1(chimass);
-	Particle darkmatter2(chimass);
-	Particle electron1(emass);
-	Particle electron2(emass);
 
     Kinematics kin;
 	DUNEDetector det;
@@ -400,9 +394,12 @@ void DetectorAnalysis::Analyze(const std::string& filen)
 
     long long neutrino_entries = neutrino_tree->GetEntries();
     int neutrino_intersectcount = 0;
+    int neutrino_scattercount = 0;
     for(Int_t i = 0; i < neutrino_entries; ++i) {
         neutrino_tree->GetEvent(i);
         Particle neutrino(0);
+        Particle electron(emass);
+
         neutrino.FourMomentum(ndxdz*ndz, ndydz*ndz, ndz, ne);
 
         nupz_1->Fill(neutrino.pz);
@@ -414,18 +411,29 @@ void DetectorAnalysis::Analyze(const std::string& filen)
             nupz_2->Fill(neutrino.pz);
             nue_2->Fill(neutrino.E);
         }
-        /*scatter.probscatter(DMSwitch,Nscatter,probMax,vpmass,chimass,kappa,alpha,darkmatter1);
-        scatter.scatterevent(DMSwitch,Nelectron,vpmass,chimass,kappa,alpha,darkmatter1,electron1);
-        if(DMSwitch == 2) {
+        //scatter.probscatterNeutrino(Switch,neutrino_scattercount,probMax,neutrino);
+        Switch = 2;
+        scatter.scattereventNeutrino(Switch,neutrino_scattercount,neutrino,electron);
+        if(Switch == 2) {
             nupz_3->Fill(neutrino.pz);
             nue_3->Fill(neutrino.E);
 
-        }*/
+            nuepz_3->Fill(electron.pz);
+            nuee_3->Fill(electron.E);
+        }
     }
+    std::cout << "Neutrino intersections: (" << neutrino_intersectcount << " / " << neutrino_entries << ")\n";
+    std::cout << "Neutrino scatters: (" << neutrino_scattercount << " / " << neutrino_intersectcount << ")\n";
 
 
 	TClonesArray* array = new TClonesArray("TRootLHEFParticle", 5);
 	branch->SetAddress(&array);
+
+    Particle darkphoton(vpmass);
+    Particle darkmatter1(chimass);
+    Particle darkmatter2(chimass);
+    Particle electron1(emass);
+    Particle electron2(emass);
 
     for(Int_t i = 0; i < nentries; ++i)
     {

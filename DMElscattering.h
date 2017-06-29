@@ -22,7 +22,7 @@ public:
 	void scatterevent(int &,int &,double,double,double,double,Particle&,Particle &);
 	void probscatterNeutrino(int &dswitch, int &Nscat, double &pMax, Particle &DM);
 
-	void scattereventNeutrino(int &dswitch, int &Nelec, double MDM, Particle &DM, Particle &electron);
+	void scattereventNeutrino(int &dswitch, int &Nelec, Particle &DM, Particle &electron);
 
     double nudSigmadEe(double nE, double theta);
 
