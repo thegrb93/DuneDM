@@ -8,7 +8,9 @@ class DMscattering {
 	double EDM, MDM;
 	double MDP;
 	double kappa, alphaD;
+    std::vector<double> neutrino_sigma, neutrino_energy;
 public:
+    DMscattering();
 	double EeTheta (double,double,double);
 	double EeTMax (double,double);
 	double EeTMin (double,double);
@@ -18,9 +20,12 @@ public:
 	double sigma (double,double,double,double,double);
 	void probscatter(int &,int &,double &,double,double,double,double,Particle&);
 	void scatterevent(int &,int &,double,double,double,double,Particle&,Particle &);
-	void probscatterNeutrino(int &dswitch, int &Nscat, double &pMax, std::vector<double> &energies,
-                             std::vector<double> &xsections, Particle &DM);
+	void probscatterNeutrino(int &dswitch, int &Nscat, double &pMax, Particle &DM);
 
 	void scattereventNeutrino(int &dswitch, int &Nelec, double MDM, Particle &DM, Particle &electron);
+
+    double nudSigmadEe(double nE, double theta);
+
+    double nuSigma(double nE);
 };
 

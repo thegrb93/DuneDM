@@ -312,15 +312,6 @@ DetectorAnalysis::~DetectorAnalysis()
 {
 }
 
-static double toDouble(const char* s)
-{
-	std::stringstream ss;
-	ss << std::string(s);
-	double d;
-	ss >> d;
-	if(ss.good()) return d; else return 0;
-}
-
 void DetectorAnalysis::Init()
 {
 	//if(gOptions[OPT_DETECTOR])
@@ -360,18 +351,7 @@ void DetectorAnalysis::Analyze(const std::string& filen)
 	Particle electron1(emass);
 	Particle electron2(emass);
 
-    std::vector<double> neutrino_energy, neutrino_xsection;
-    std::ifstream fneutrino("nusec_nc_dat.txt");
-    while(fneutrino.good())
-    {
-        size_t size = neutrino_energy.size();
-        neutrino_energy.resize(size+1);
-        neutrino_xsection.resize(size+1);
-        fneutrino >> neutrino_energy[size];
-        fneutrino >> neutrino_xsection[size];
-    }
-
-	Kinematics kin;	
+    Kinematics kin;
 	DUNEDetector det;
 	DMscattering scatter;
 	
@@ -418,7 +398,7 @@ void DetectorAnalysis::Analyze(const std::string& filen)
     neutrino_tree->SetBranchAddress("Npz", &ndz);
     neutrino_tree->SetBranchAddress("Nenergy", &ne);
 
-    int neutrino_entries = neutrino_tree->GetEntries();
+    long long neutrino_entries = neutrino_tree->GetEntries();
     int neutrino_intersectcount = 0;
     for(Int_t i = 0; i < neutrino_entries; ++i) {
         neutrino_tree->GetEvent(i);

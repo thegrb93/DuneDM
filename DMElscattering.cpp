@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cmath>
 #include <vector>
+#include <fstream>
 
 #include "DMElscattering.h"
 #include "Particle.h"
@@ -8,6 +9,18 @@
 #include "Kinematics.h"
 #include "DUNEdet.h"
 
+
+DMscattering::DMscattering() {
+    std::ifstream fneutrino("nusec_nc_dat.txt");
+    while(fneutrino.good())
+    {
+        size_t size = neutrino_energy.size();
+        neutrino_energy.resize(size+1);
+        neutrino_sigma.resize(size+1);
+        fneutrino >> neutrino_energy[size];
+        fneutrino >> neutrino_sigma[size];
+    }
+}
 // Electron energy as a function of 
 // electron scattering angle cross and dark matter energy
 double DMscattering::EeTheta (double EDM, double Thetael, double MDM) {
@@ -59,6 +72,31 @@ double DMscattering::dsigmadEe (double Ee, double EDM, double MDM, double MDP, d
 	rdsig = coef*F1(Ee,EDM,MDM,MDP);
 	return(rdsig);
 }
+double DMscattering::nuSigma(double nE) {
+    if(nE >= neutrino_energy[0])
+        for(int i = 1; i<neutrino_energy.size(); ++i)
+            if(nE <= neutrino_energy[i])
+                return (nE - neutrino_energy[i-1])/(neutrino_energy[i] - neutrino_energy[i-1])*(neutrino_sigma[i]-neutrino_sigma[i-1])+neutrino_sigma[i-1];
+    return -1;
+}
+//  differential Neutrino - electron scattering cross section dsigma/dEe
+double DMscattering::nudSigmadEe (double nE, double theta ) {
+    const double g1m = -0.27;
+    const double g2m = 0.23;
+    const double g1m2 = g1m*g1m;
+    const double g2m2 = g2m*g2m;
+    const double Me = 0.000511;
+    const double sigma0 = 88.06e-46;
+
+    double nE2 = nE*nE;
+    double cos2tnE2 = cos(theta);
+    cos2tnE2 = cos2tnE2 * cos2tnE2 * nE2;
+
+    double te = 2*Me*cos2tnE2/(std::pow(Me + nE, 2) - cos2tnE2);
+    double dsigmadne = sigma0 / Me * (g1m2 + g2m2*std::pow(1-te/nE, 2) - g1m*g2m*Me*te/nE2);
+    return dsigmadne;
+}
+
 // Function F2(Ee) 
 // Total DM - electron scattering cross section equals
 // sigma =  4*Pi*kappa*kappa*alpha*alphaD*( F2(EeMax)- F2(EeMin) ) 
@@ -128,7 +166,7 @@ void DMscattering::probscatter (int &dswitch, int &Nscat, double &pMax, double M
 
 }
 
-void DMscattering::probscatterNeutrino (int &dswitch, int &Nscat, double &pMax, std::vector<double>& energies, std::vector<double>& xsections, Particle& DM) {
+void DMscattering::probscatterNeutrino (int &dswitch, int &Nscat, double &pMax, Particle& DM) {
 	double pscat, Rscat;
 	double LXdet, XS;
 	double prob;
@@ -146,13 +184,7 @@ void DMscattering::probscatterNeutrino (int &dswitch, int &Nscat, double &pMax, 
 
 		LXdet = det.Ldet(DM);
 		LXdet = LXdet*convmcm;
-        XS = -1;
-        if(DM.E >= energies[0])
-		    for(int i = 1; i<energies.size(); ++i)
-                if(DM.E <= energies[i])
-                {
-                    XS = (DM.E - energies[i-1])/(energies[i] - energies[i-1])*(xsections[i]-xsections[i-1])+xsections[i-1];
-                }
+        XS = nuSigma(DM.E);
         if(XS < 0) return;
 		XS = XS*convGeV2cm2;
 		//std::cout<<DM.E<<"\t"<<(XS*pow(10,39))<<std::endl;
@@ -226,7 +258,7 @@ void DMscattering::scatterevent (int &dswitch, int &Nelec, double MDP, double MD
     }
 }
 //
-/*void DMscattering::scattereventNeutrino (int &dswitch, int &Nelec, double MDM, Particle& DM, Particle &electron) {
+void DMscattering::scattereventNeutrino (int &dswitch, int &Nelec, double MDM, Particle& DM, Particle &electron) {
     double Pi = 3.141592653589793;
     double Me = 0.000511;
     double EeMin, EeMax;
@@ -239,13 +271,11 @@ void DMscattering::scatterevent (int &dswitch, int &Nelec, double MDP, double MD
     //std::cout <<"value is" << pex <<"\t"<< pey <<"\t"<< pez <<"\t"<< Ee <<std::endl;
     if (dswitch == 2)
     {
-
-
         eswitch = 0;
-        EeMax = EeTMax(DM.E,0);
-        EeMin = EeTMin(DM.E,0);
-        sig = sigma(DM.E,MDM,MDP,kap,alD);
-        dsigMax = dsigmadEe(EeMin,DM.E,MDM,MDP,kap,alD);
+        EeMax = 2*Me*DM.E*DM.E / (std::pow(Me + DM.E, 2) - DM.E*DM.E);
+        EeMin = 0;
+        sig = nuSigma(DM.E);
+        dsigMax = nudSigmadEe(DM.E, 0);
         psigMax =(EeMax-EeMin)*dsigMax/sig;
 
         while (eswitch == 0)
@@ -255,7 +285,7 @@ void DMscattering::scatterevent (int &dswitch, int &Nelec, double MDP, double MD
             Thetae = xe*Pi;
 
             Ee = EeMin + xe*(EeMax-EeMin);
-            dsig = dsigmadEe(Ee,DM.E,MDM,MDP,kap,alD);
+            dsig = nudSigmadEe(DM.E, Thetae);
             psig = (EeMax-EeMin)*dsig/sig;
             Re = psig/psigMax;
             if (Re > probe)
@@ -273,4 +303,4 @@ void DMscattering::scatterevent (int &dswitch, int &Nelec, double MDP, double MD
             }
         }
     }
-}*/
+}
