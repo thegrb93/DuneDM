@@ -280,10 +280,10 @@ void DMscattering::scattereventNeutrino (int &dswitch, int &Nelec, Particle& DM,
         dsigMax = nudSigmadEe(DM.E, 0);
 
         const double step = 0.01;
-        double numericalSigma = 0;
+        double integratedSigma = 0;
         for(double t = 0; t<=Pi/2; t+=step)
-            numericalSigma += nudSigmadEe(DM.E, t)*step;
-        std::cout << "Sigma: " << sig << "    NumericalSigma: " << numericalSigma << std::endl;
+            integratedSigma += nudSigmadEe(DM.E, t)*step;
+        std::cout << "Emphirical Sigma: " << sig << "     Estimated Sigma: " << 17.23e-43*DM.E << "    Integrated Sigma: " << integratedSigma << std::endl;
 
         psigMax =(EeMax-EeMin)*dsigMax/sig;
 
