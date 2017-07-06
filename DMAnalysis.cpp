@@ -338,6 +338,44 @@ void DetectorAnalysis::Init()
 	smear_sigma = 0.06;
 }
 
+void DetectorAnalysis::saveComparison(const char* savename, const char* canvastitle, TH1D* hist1, TH1D* hist2, const char* histn1, const char* histn2)
+{
+    TCanvas* nu_dm1 = new TCanvas(savename,canvastitle,1024,1024);
+    nu_dm1->SetFillColor(33);
+	nu_dm1->SetFrameFillColor(17);
+	nu_dm1->SetGrid();
+
+	// draw the legend
+	TLegend *legend=new TLegend(0.6,0.75,0.88,0.85);
+	legend->SetTextFont(72);
+	legend->SetTextSize(0.04);
+	
+	const char* prevtitle = hist1->GetTitle();
+	hist1->SetTitle(canvastitle);
+	hist1->SetLineColor(1);
+	hist1->SetMarkerSize(0.8);
+	hist1->SetStats(0);
+	hist1->Draw();
+	
+	hist2->SetLineColor(2);
+	hist2->SetMarkerSize(0.8);
+	hist2->SetStats(0);
+	hist2->Draw("same");
+	
+	legend->AddEntry(hist1,histn1);
+	legend->AddEntry(hist2,histn2);
+	legend->Draw();
+	
+	nu_dm1->Update();
+	nu_dm1->Draw();
+	nu_dm1->SaveAs((std::string(savename)+".root").c_str());
+	
+	hist1->SetTitle(prevtitle);
+	
+	delete nu_dm1;
+	delete legend;
+}
+
 void DetectorAnalysis::Analyze(const std::string& filen)
 {
 	double vpmass, chimass, kappa, alpha;
@@ -387,42 +425,44 @@ void DetectorAnalysis::Analyze(const std::string& filen)
     TTree* neutrino_tree = (TTree*)neutrinos->Get("nudata");
     neutrino_tree->SetMakeClass(1);
     float ndxdz, ndydz, ndz, ne;
+    double Nimpwt;
     neutrino_tree->SetBranchAddress("Ndxdz", &ndxdz);
     neutrino_tree->SetBranchAddress("Ndydz", &ndydz);
     neutrino_tree->SetBranchAddress("Npz", &ndz);
     neutrino_tree->SetBranchAddress("Nenergy", &ne);
+    neutrino_tree->SetBranchAddress("Nimpwt", &Nimpwt);
 
     long long neutrino_entries = neutrino_tree->GetEntries();
     int neutrino_intersectcount = 0;
     int neutrino_scattercount = 0;
-    for(Int_t i = 0; i < neutrino_entries; ++i) {
+    for(Int_t i = 0, j = 0; j < nentries; i=(i+1)%neutrino_entries, ++j) {
         neutrino_tree->GetEvent(i);
         Particle neutrino(0);
         Particle electron(emass);
+        float weight = (float)Nimpwt;
 
         neutrino.FourMomentum(ndxdz*ndz, ndydz*ndz, ndz, ne);
 
-        nupz_1->Fill(neutrino.pz);
-        nue_1->Fill(neutrino.E);
+        nupz_1->Fill(neutrino.pz, weight);
+        nue_1->Fill(neutrino.E, weight);
 
         int Switch = 0;
         det.intersect(Switch,neutrino_intersectcount,neutrino);
         if(Switch == 1) {
-            nupz_2->Fill(neutrino.pz);
-            nue_2->Fill(neutrino.E);
+            nupz_2->Fill(neutrino.pz, weight);
+            nue_2->Fill(neutrino.E, weight);
         }
-        //scatter.probscatterNeutrino(Switch,neutrino_scattercount,probMax,neutrino);
-        Switch = 2;
+        scatter.probscatterNeutrino(Switch,neutrino_scattercount,probMax,neutrino);
         scatter.scattereventNeutrino(Switch,neutrino_scattercount,neutrino,electron);
         if(Switch == 2) {
-            nupz_3->Fill(neutrino.pz);
-            nue_3->Fill(neutrino.E);
+            nupz_3->Fill(neutrino.pz, weight);
+            nue_3->Fill(neutrino.E, weight);
 
-            nuepz_3->Fill(electron.pz);
-            nuee_3->Fill(electron.E);
+            nuepz_3->Fill(electron.pz, weight);
+            nuee_3->Fill(electron.E, weight);
         }
     }
-    std::cout << "Neutrino intersections: (" << neutrino_intersectcount << " / " << neutrino_entries << ")\n";
+    std::cout << "Neutrino intersections: (" << neutrino_intersectcount << " / " << nentries << ")\n";
     std::cout << "Neutrino scatters: (" << neutrino_scattercount << " / " << neutrino_intersectcount << ")\n";
 
 
@@ -524,6 +564,11 @@ void DetectorAnalysis::Analyze(const std::string& filen)
 	
 	output->Write();
 	
+	saveComparison("nu_dmpz1", "DM vs Neutrino P_{z}", dmpz_1, nupz_1, "Dark matter P_{z}", "Neutrino P_{z}");
+	saveComparison("nu_dme1", "DM vs Neutrino E", dme_1, nue_1, "Dark matter E", "Neutrino E");
+	saveComparison("nu_dmpz2", "DM vs Neutrino Intersections P_{z}", dmpz_2, nupz_2, "Dark matter P_{z}", "Neutrino P_{z}");
+	saveComparison("nu_dme2", "DM vs Neutrino Intersections E", dme_2, nue_2, "Dark matter E", "Neutrino E");
+		
 	delete dmpz_1;
 	delete dme_1;
 	delete dmpz_2;

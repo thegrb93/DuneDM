@@ -74,6 +74,7 @@ public:
 	DetectorAnalysis();
 	~DetectorAnalysis();
 	static DMAnalysis* create();
+	static void saveComparison(const char* savename, const char* canvastitle, TH1D* hist1, TH1D* hist2, const char* histn1, const char* histn2);
 protected:
 	void Analyze(const std::string& file);
 	void Init();

@@ -174,7 +174,7 @@ void DMscattering::probscatterNeutrino (int &dswitch, int &Nscat, double &pMax, 
 	double ne = 5.1e+23;
 	//int Nscatter;
 	double convmcm, convGeV2cm2;
-	convGeV2cm2 = 1e-46;
+	convGeV2cm2 = 1e-42;
 	convmcm = 100.0;
 	pscat = Random::Flat(0,1);
 	Kinematics kin;
@@ -279,12 +279,13 @@ void DMscattering::scattereventNeutrino (int &dswitch, int &Nelec, Particle& DM,
         if(sig<0) return;
         dsigMax = nudSigmadEe(DM.E, 0);
 
-        const double step = 0.01;
+        /*const double step = 0.01;
         double integratedSigma = 0;
         for(double t = 0; t<=Pi/2; t+=step)
             integratedSigma += nudSigmadEe(DM.E, t)*step;
         std::cout << "Emphirical Sigma: " << sig << "     Estimated Sigma: " << 17.23e-43*DM.E << "    Integrated Sigma: " << integratedSigma << std::endl;
-
+        */
+        
         psigMax =(EeMax-EeMin)*dsigMax/sig;
 
         while (eswitch == 0)
