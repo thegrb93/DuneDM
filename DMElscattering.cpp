@@ -170,7 +170,7 @@ void DMscattering::probscatterNeutrino (int &dswitch, int &Nscat, double &pMax, 
 	double pscat, Rscat;
 	double LXdet, XS;
 	double prob;
-	double pMax0 = 1.0e-10;
+	double pMax0 = 1.0e-14;
 	double ne = 5.1e+23;
 	//int Nscatter;
 	double convmcm, convGeV2cm2;

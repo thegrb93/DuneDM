@@ -8,6 +8,7 @@
 #include <TCanvas.h>
 #include <TFile.h>
 #include <TTree.h>
+#include <THStack.h>
 #include <TH2D.h>
 #include <TF1.h>
 #include <TChain.h>
@@ -344,23 +345,29 @@ void DetectorAnalysis::saveComparison(const char* savename, const char* canvasti
     nu_dm1->SetFillColor(33);
 	nu_dm1->SetFrameFillColor(17);
 	nu_dm1->SetGrid();
+	//nu_dm1->SetLogy();
 
+    THStack *hs = new THStack("hs",canvastitle);
+    
 	// draw the legend
 	TLegend *legend=new TLegend(0.6,0.75,0.88,0.85);
 	legend->SetTextFont(72);
 	legend->SetTextSize(0.04);
 	
-	const char* prevtitle = hist1->GetTitle();
-	hist1->SetTitle(canvastitle);
 	hist1->SetLineColor(1);
-	hist1->SetMarkerSize(0.8);
-	hist1->SetStats(0);
-	hist1->Draw();
+	//hist1->SetFillColor(1);
+	//hist1->SetMarkerStyle(21);
+	//hist1->SetMarkerSize(0.8);
+	//hist1->SetStats(0);
+	hs->Add(hist1);
 	
 	hist2->SetLineColor(2);
-	hist2->SetMarkerSize(0.8);
-	hist2->SetStats(0);
-	hist2->Draw("same");
+	//hist2->SetFillColor(2);
+	//hist1->SetMarkerStyle(21);
+	//hist2->SetMarkerSize(0.8);
+	//hist2->SetStats(0);
+	hs->Add(hist2);
+	hs->Draw("hist nostack");
 	
 	legend->AddEntry(hist1,histn1);
 	legend->AddEntry(hist2,histn2);
@@ -369,8 +376,6 @@ void DetectorAnalysis::saveComparison(const char* savename, const char* canvasti
 	nu_dm1->Update();
 	nu_dm1->Draw();
 	nu_dm1->SaveAs((std::string(savename)+".root").c_str());
-	
-	hist1->SetTitle(prevtitle);
 	
 	delete nu_dm1;
 	delete legend;
@@ -568,6 +573,8 @@ void DetectorAnalysis::Analyze(const std::string& filen)
 	saveComparison("nu_dme1", "DM vs Neutrino E", dme_1, nue_1, "Dark matter E", "Neutrino E");
 	saveComparison("nu_dmpz2", "DM vs Neutrino Intersections P_{z}", dmpz_2, nupz_2, "Dark matter P_{z}", "Neutrino P_{z}");
 	saveComparison("nu_dme2", "DM vs Neutrino Intersections E", dme_2, nue_2, "Dark matter E", "Neutrino E");
+	saveComparison("enu_dmpz3", "DM vs Neutrino Electron Scatter P_{z}", epz_3, nuepz_3, "Electron - Dark matter P_{z}", "Electron - Neutrino P_{z}");
+	saveComparison("enu_dme3", "DM vs Neutrino Electron Scatter E", ee_3, nuee_3, "Electron - Dark matter E", "Electron - Neutrino E");
 		
 	delete dmpz_1;
 	delete dme_1;
