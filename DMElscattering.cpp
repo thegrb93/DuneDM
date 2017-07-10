@@ -188,9 +188,10 @@ void DMscattering::probscatterNeutrino (int &dswitch, int &Nscat, double &pMax, 
         if(XS < 0) return;
 		XS = XS*convGeV2cm2;
 		//std::cout<<DM.E<<"\t"<<(XS*pow(10,39))<<std::endl;
-
+                 std::cout<<"XS is"<<XS<<std::endl;
 		prob = XS*ne*LXdet;
-
+        
+                std::cout<<"Prob is"<<prob<<std::endl;
 		if (prob > pMax0)
 		{
 			pMax = prob;
@@ -235,7 +236,7 @@ void DMscattering::scatterevent (int &dswitch, int &Nelec, double MDP, double MD
         {
             probe = Random::Flat(0,1);
             xe = Random::Flat(0,1);
-            Thetae = xe*Pi;
+            Thetae = xe*Pi/2;
 
             Ee = EeMin + xe*(EeMax-EeMin);
             dsig = dsigmadEe(Ee,DM.E,MDM,MDP,kap,alD);
@@ -279,20 +280,19 @@ void DMscattering::scattereventNeutrino (int &dswitch, int &Nelec, Particle& DM,
         if(sig<0) return;
         dsigMax = nudSigmadEe(DM.E, 0);
 
-        /*const double step = 0.01;
+        const double step = 0.01;
         double integratedSigma = 0;
         for(double t = 0; t<=Pi/2; t+=step)
             integratedSigma += nudSigmadEe(DM.E, t)*step;
-        std::cout << "Emphirical Sigma: " << sig << "     Estimated Sigma: " << 17.23e-43*DM.E << "    Integrated Sigma: " << integratedSigma << std::endl;
-        */
-        
+   //     std::cout << "Emphirical Sigma: " << sig << "     Estimated Sigma: " << 17.23e-43*DM.E << "    Integrated Sigma: " << integratedSigma << std::endl;
+
         psigMax =(EeMax-EeMin)*dsigMax/sig;
 
         while (eswitch == 0)
         {
             probe = Random::Flat(0,1);
             xe = Random::Flat(0,1);
-            Thetae = xe*Pi;
+            Thetae = xe*Pi/2;
 
             Ee = EeMin + xe*(EeMax-EeMin);
             dsig = nudSigmadEe(DM.E, Thetae);
