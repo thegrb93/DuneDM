@@ -351,7 +351,7 @@ void DetectorAnalysis::saveComparison(const char* savename, const char* canvasti
 	// draw the legend
 	TLegend *legend=new TLegend(0.6,0.75,0.88,0.85);
 	legend->SetTextFont(72);
-	legend->SetTextSize(0.04);
+	legend->SetTextSize(0.02);
 	
 	hist1->SetLineColor(1);
 	//hist1->SetFillColor(1);
@@ -448,12 +448,12 @@ void DetectorAnalysis::Analyze(const std::string& filen)
     long long neutrino_entries = neutrino_tree->GetEntries();
     int neutrino_intersectcount = 0;
     int neutrino_scattercount = 0;
-    float total_weight = 0;
+    double total_weight = 0;
     for(Int_t i = 0, j = 0; j < nentries*5; i=(i+1)%neutrino_entries, ++j) {
         neutrino_tree->GetEvent(i);
         Particle neutrino(0);
         Particle electron(emass);
-        float weight = (float)Nimpwt*(float)NWtNear[0];
+        double weight = Nimpwt*NWtNear[0];
         total_weight += weight;
 
         neutrino.FourMomentum(ndxdz*ndz, ndydz*ndz, ndz, ne);
@@ -480,7 +480,7 @@ void DetectorAnalysis::Analyze(const std::string& filen)
 			nuetheta_3->Fill(acos(std::min<double>(std::max<double>(electron.pz/pnorm, -1), 1)));
         }
     }
-    float scale = (float)nentries/total_weight;
+    double scale = (double)nentries/total_weight;
     nupz_1->Scale(scale);
     nue_1->Scale(scale);
     nupz_2->Scale(scale);
