@@ -188,10 +188,10 @@ void DMscattering::probscatterNeutrino (int &dswitch, int &Nscat, double &pMax, 
         if(XS < 0) return;
 		XS = XS*convGeV2cm2;
 		//std::cout<<DM.E<<"\t"<<(XS*pow(10,39))<<std::endl;
-                 std::cout<<"XS is"<<XS<<std::endl;
+                 //std::cout<<"XS is"<<XS<<std::endl;
 		prob = XS*ne*LXdet;
         
-                std::cout<<"Prob is"<<prob<<std::endl;
+                //std::cout<<"Prob is"<<prob<<std::endl;
 		if (prob > pMax0)
 		{
 			pMax = prob;
