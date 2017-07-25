@@ -25,7 +25,7 @@ int main (int argc, char** argv) {
             mode = "detector";
 			
 		std::map<std::string,DMAnalysis*(*)()> modes = {
-			{"statisics", &StatisticsAnalysis::create},
+			{"statistics", &StatisticsAnalysis::create},
 			{"histograms", &DarkMatterDistribution::create},
 			{"detector", &DetectorAnalysis::create}
 		};

@@ -28,7 +28,7 @@
 #include "DUNEdet.h"
 #include "DMElscattering.h"
 
-
+const double emass = 0.000511;
 
 DMAnalysis::DMAnalysis():
 branch(0),
@@ -120,23 +120,104 @@ DMAnalysis* StatisticsAnalysis::create()
 
 StatisticsAnalysis::~StatisticsAnalysis()
 {
-	delete graph;
+	delete graphchi2;
+	delete graphdmee;
+	delete neutrino_electron_e;
 }
 
 void StatisticsAnalysis::Init()
 {
 	index = 0;
-	graph = new TGraph2D(files.size());
-	graph->SetTitle("#mu_{#chi pz};VP mass(GeV);#chi mass(GeV);#mu_{pz}(GeV/c^{2})");
+	graphchi2 = new TGraph2D(files.size());
+	graphchi2->SetName("chi2");
+	graphchi2->SetTitle("Dark Matter #chi^{2};VP mass(GeV);#chi mass(GeV);#chi^{2}");
+	
+	graphdmee = new TGraph2D(files.size());
+	graphdmee->SetName("dmee");
+	graphdmee->SetTitle("Electron Scatter E against dm Mean;VP mass(GeV);#chi mass(GeV);E(GeV)");
+	
+	Kinematics kin;
+	DUNEDetector det;
+	DMscattering scatter;
+	
+	int scatterCount = 0;
+	int Nscatter = 0;
+	int Nelectron = 0;
+	double probMax = 10e-15;
+	
+    neutrino_electron_e = new TH1D("nuee3","Nu-Electron Scatter E;E (GeV)", 100, 0, 6);
+	TFile* neutrinos = new TFile("g4lbne_nudata.root");
+    TTree* neutrino_tree = (TTree*)neutrinos->Get("nudata");
+    neutrino_tree->SetMakeClass(1);
+    float ndxdz, ndydz, ndz;
+    double Nimpwt;
+    double NenergyN[5];
+    double NWtNear[5];
+    neutrino_tree->SetBranchAddress("Ndxdz", &ndxdz);
+    neutrino_tree->SetBranchAddress("Ndydz", &ndydz);
+    neutrino_tree->SetBranchAddress("Npz", &ndz);
+    neutrino_tree->SetBranchAddress("NenergyN[5]", &NenergyN);
+    neutrino_tree->SetBranchAddress("Nimpwt", &Nimpwt);
+    neutrino_tree->SetBranchAddress("NWtNear[5]", &NWtNear);
+
+    long long neutrino_entries = neutrino_tree->GetEntries();
+    int neutrino_intersectcount = 0;
+    int neutrino_scattercount = 0;
+    double total_weight = 0;
+    std::cout << "Generating neutrino distribution...\n";
+    for(Int_t i = 0, j = 0; j < 5000000; i=(i+1)%neutrino_entries, ++j) {
+        neutrino_tree->GetEvent(i);
+        Particle neutrino(0);
+        Particle electron(emass);
+        double weight = Nimpwt*NWtNear[0];
+        total_weight += weight;
+
+        neutrino.FourMomentum(ndxdz*ndz, ndydz*ndz, ndz, NenergyN[0]);
+
+        //nupz_1->Fill(neutrino.pz, weight);
+        //nue_1->Fill(neutrino.E, weight);
+
+        int Switch = 0;
+        det.intersect(Switch,neutrino_intersectcount,neutrino);
+        if(Switch == 1) {
+            //nupz_2->Fill(neutrino.pz, weight);
+            //nue_2->Fill(neutrino.E, weight);
+        }
+        scatter.probscatterNeutrino(Switch,neutrino_scattercount,probMax,neutrino);
+        scatter.scattereventNeutrino(Switch,neutrino_scattercount,neutrino,electron);
+        if(Switch == 2) {
+            //nupz_3->Fill(neutrino.pz, weight);
+            //nue_3->Fill(neutrino.E, weight);
+
+            //nuepz_3->Fill(electron.pz, weight);
+            neutrino_electron_e->Fill(electron.E, weight);
+            
+			//double pnorm = sqrt(electron.px*electron.px+electron.py*electron.py+electron.pz*electron.pz);
+			//nuetheta_3->Fill(acos(std::min<double>(std::max<double>(electron.pz/pnorm, -1), 1)));
+        }
+    }
+    double scale = (double)100000/total_weight;
+    neutrino_electron_e->Scale(scale);
+    
+    delete neutrinos;
 }
 
 void StatisticsAnalysis::Analyze(const std::string& filen)
 {
 	double vpmass, chimass, kappa, alpha;
 	if(DMParameters(filen, vpmass, chimass, kappa, alpha)) return;
+	std::cout << filen << std::endl;
 	
-	double z = 0;
+	Kinematics kin;
+	DUNEDetector det;
+	DMscattering scatter;
 	
+	int scatterCount = 0;
+	int Nscatter = 0;
+	int Nelectron = 0;
+	double probMax = 10e-15;
+	
+	TH1D* dm_electron_e = new TH1D("dme","DM-Electron Scatter E;E (GeV)", 100, 0, 6);
 	TClonesArray* array = new TClonesArray("TRootLHEFParticle", 5);
 	branch->SetAddress(&array);
 		
@@ -146,22 +227,39 @@ void StatisticsAnalysis::Analyze(const std::string& filen)
 		for(Int_t j = 0; j < array->GetEntries(); ++j)
 		{
 			TRootLHEFParticle* particle = (TRootLHEFParticle*)array->At(j);
-			switch(particle->PID)
+			if(particle->PID==33)
 			{
-				case 33:
-					z += particle->Pz;
-				break;
-				case -33:
-				break;
+				Particle darkmatter1(chimass);
+				Particle electron1(emass);
+				darkmatter1.FourMomentum(particle->Px,particle->Py,-particle->Pz,particle->E);
+				
+				int DMSwitch = 0;
+				det.intersect(DMSwitch,scatterCount,darkmatter1);
+				scatter.probscatter(DMSwitch,Nscatter,probMax,vpmass,chimass,kappa,alpha,darkmatter1);
+				scatter.scatterevent(DMSwitch,Nelectron,vpmass,chimass,kappa,alpha,darkmatter1,electron1);
+				if(DMSwitch == 2)
+				{
+					dm_electron_e->Fill(electron1.E);
+				}
 			}
 		}
 	}
 	
-	z /= (double)nentries;
-	graph->SetPoint(index, vpmass, chimass, z);
+	double chi2 = 0;
+	for(int i = 1; i<=dm_electron_e->GetNbinsX(); ++i)
+	{
+		double N_bg = neutrino_electron_e->GetBinContent(i);
+		double N_tot = dm_electron_e->GetBinContent(i) + N_bg;
+		if(N_bg == 0) continue;
+		chi2 += 2*(N_bg*log(N_bg/N_tot) + N_tot - N_bg);
+	}
+	
+	graphchi2->SetPoint(index, vpmass, chimass, chi2);
+	graphdmee->SetPoint(index, vpmass, chimass, dm_electron_e->GetMean(1));
 	++index;
 	
 	delete array;
+	delete dm_electron_e;
 }
 
 void StatisticsAnalysis::UnInit()
@@ -170,22 +268,25 @@ void StatisticsAnalysis::UnInit()
 	std::string params(argv[2]);
 	std::string outputfilen(argv[3]);*/
 
-	TCanvas* canvas = new TCanvas("output", "", 1600,900);
+	TCanvas* canvas = new TCanvas("output", "", 1920,1080);
 	canvas->SetFillColor(33);
 	canvas->SetFrameFillColor(17);
 	canvas->SetGrid();
 	
-	//canvas->SetTheta(90);
-	//canvas->SetPhi(0);
-	graph->Draw("surf1");
+	canvas->SetTheta(90);
+	canvas->SetPhi(0);
 	
+	graphchi2->Draw("surf1 Z");
 	canvas->Update();
+	canvas->SaveAs("chi2.png");
 	
-	std::stringstream filename;
-	//filename << "images/" << name << "_" << outputfilen << ".png";
-	filename << "graph.png";
+	graphdmee->Draw("surf1 Z");
+	canvas->Update();
+	canvas->SaveAs("dme.png");
 	
-	canvas->SaveAs(filename.str().c_str());
+	neutrino_electron_e->Draw();
+	canvas->Update();
+	canvas->SaveAs("nue.png");
 
 	delete canvas;
 }
@@ -389,8 +490,6 @@ void DetectorAnalysis::Analyze(const std::string& filen)
 {
 	double vpmass, chimass, kappa, alpha;
 	if(DMParameters(filen, vpmass, chimass, kappa, alpha)) return;
-	
-	const double emass = 0.000511;
 
     Kinematics kin;
 	DUNEDetector det;

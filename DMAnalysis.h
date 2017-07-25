@@ -33,7 +33,8 @@ protected:
 
 class StatisticsAnalysis : public DMAnalysis
 {
-	TGraph2D* graph;
+	TGraph2D* graphchi2, *graphdmee, *graphnuee;
+	TH1D* neutrino_electron_e;
 	int index;
 	
 public:
