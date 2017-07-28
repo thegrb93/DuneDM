@@ -9,4 +9,5 @@ CTestTestfile.cmake
 *.pcm.cxx
 bin
 *.rootmap
+.idea
 
