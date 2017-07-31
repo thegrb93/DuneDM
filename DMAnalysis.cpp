@@ -15,6 +15,7 @@
 #include <TGraph2D.h>
 #include <TLegend.h>
 #include <fstream>
+#include <TApplication.h>
 
 // Header files for the classes stored in the TTree if any.
 #include "ExRootClasses.h"
@@ -122,15 +123,25 @@ StatisticsAnalysis::~StatisticsAnalysis()
 {
 	delete graphchi2;
 	delete graphdmee;
+    delete graphsig;
+    delete graphbg;
 	delete neutrino_electron_e;
 }
 
 void StatisticsAnalysis::Init()
 {
 	index = 0;
-	graphchi2 = new TGraph2D(files.size());
-	graphchi2->SetName("chi2");
-	graphchi2->SetTitle("Dark Matter #chi^{2};VP mass(GeV);#chi mass(GeV);#chi^{2}");
+    graphchi2 = new TGraph2D(files.size());
+    graphchi2->SetName("chi2");
+    graphchi2->SetTitle("Dark Matter #chi^{2};VP mass(GeV);#chi mass(GeV);#chi^{2}");
+
+    graphsig = new TGraph2D(files.size());
+    graphsig->SetName("signal");
+    graphsig->SetTitle("Signal;VP mass(GeV);#chi mass(GeV);Counts");
+
+    graphbg = new TGraph2D(files.size());
+    graphbg->SetName("bg");
+    graphbg->SetTitle("Background;VP mass(GeV);#chi mass(GeV);Counts");
 	
 	graphdmee = new TGraph2D(files.size());
 	graphdmee->SetName("dmee");
@@ -163,9 +174,10 @@ void StatisticsAnalysis::Init()
     long long neutrino_entries = neutrino_tree->GetEntries();
     int neutrino_intersectcount = 0;
     int neutrino_scattercount = 0;
+    int neutrino_total = 5000000;
     double total_weight = 0;
     std::cout << "Generating neutrino distribution...\n";
-    for(Int_t i = 0, j = 0; j < 5000000; i=(i+1)%neutrino_entries, ++j) {
+    for(Int_t i = 0, j = 0; j < neutrino_total; i=(i+1)%neutrino_entries, ++j) {
         neutrino_tree->GetEvent(i);
         Particle neutrino(0);
         Particle electron(emass);
@@ -204,6 +216,7 @@ void StatisticsAnalysis::Init()
 
 void StatisticsAnalysis::Analyze(const std::string& filen)
 {
+    //if(index>10) return;
 	double vpmass, chimass, kappa, alpha;
 	if(DMParameters(filen, vpmass, chimass, kappa, alpha)) return;
 	std::cout << filen << std::endl;
@@ -253,7 +266,8 @@ void StatisticsAnalysis::Analyze(const std::string& filen)
 		if(N_bg == 0) continue;
 		chi2 += 2*(N_bg*log(N_bg/N_tot) + N_tot - N_bg);
 	}
-	
+
+    graphsig->SetPoint(index, vpmass, chimass, dm_electron_e->Integral());
 	graphchi2->SetPoint(index, vpmass, chimass, chi2);
 	graphdmee->SetPoint(index, vpmass, chimass, dm_electron_e->GetMean(1));
 	++index;
@@ -273,13 +287,17 @@ void StatisticsAnalysis::UnInit()
 	canvas->SetFrameFillColor(17);
 	canvas->SetGrid();
 	
-	canvas->SetTheta(90);
-	canvas->SetPhi(0);
-	
-	graphchi2->Draw("surf1 Z");
-	canvas->Update();
-	canvas->SaveAs("chi2.png");
-	
+	canvas->SetTheta(-90);
+	canvas->SetPhi(-0.0001);
+
+    graphchi2->Draw("surf1 Z");
+    canvas->Update();
+    canvas->SaveAs("chi2.png");
+
+    graphsig->Draw("surf1 Z");
+    canvas->Update();
+    canvas->SaveAs("sig.png");
+
 	graphdmee->Draw("surf1 Z");
 	canvas->Update();
 	canvas->SaveAs("dme.png");
@@ -287,6 +305,9 @@ void StatisticsAnalysis::UnInit()
 	neutrino_electron_e->Draw();
 	canvas->Update();
 	canvas->SaveAs("nue.png");
+
+    /*canvas->Draw();
+    gApp->Run();*/
 
 	delete canvas;
 }

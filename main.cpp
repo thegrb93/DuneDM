@@ -2,8 +2,11 @@
 #include <iostream>
 #include <vector>
 #include <map>
+#include <TApplication.h>
 #include "cxxopts.hpp"
 #include "DMAnalysis.h"
+
+TApplication* gApp;
 
 int main (int argc, char** argv) {
 	cxxopts::Options options("DuneDM", "USAGE: DuneDM [options] files");
@@ -15,6 +18,9 @@ int main (int argc, char** argv) {
             ("files","The root files to analyze", cxxopts::value<std::vector<std::string>>(), "");
     options.parse_positional("files");
 	options.parse(argc, argv);
+
+    //TApplication app("tapp", &argc, argv);
+    //gApp = &app;
 
     const std::vector<std::string>& files = options["files"].as<std::vector<std::string>>();
 	if(files.size()>0) {

@@ -3,8 +3,6 @@
 #
 cmake_minimum_required(VERSION 2.6 FATAL_ERROR)
 project(DuneDM)
-set(CMAKE_BUILD_TYPE Debug)
-set(EXECUTABLE_OUTPUT_PATH "${CMAKE_BINARY_DIR}/bin")
 
 set(EXROOTANALYSIS_PATH "" CACHE FILEPATH "Path to exrootanalysis")
 

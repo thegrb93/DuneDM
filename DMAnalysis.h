@@ -7,6 +7,8 @@ enum optionIndex {
 OPT_UNKNOWN, OPT_HELP, OPT_MODE, OPT_PARTICLE, OPT_PARTICLEATTRIBUTE,
 OPT_DETECTOR, OPT_DET_SMEAR_SIG, OPT_DET_SMEAR_MEAN};
 
+class TApplication;
+extern TApplication* gApp;
 
 class TFile;
 class TBranch;
@@ -33,7 +35,7 @@ protected:
 
 class StatisticsAnalysis : public DMAnalysis
 {
-	TGraph2D* graphchi2, *graphdmee, *graphnuee;
+	TGraph2D* graphchi2, *graphdmee, *graphnuee, *graphsig, *graphbg;
 	TH1D* neutrino_electron_e;
 	int index;
 	
