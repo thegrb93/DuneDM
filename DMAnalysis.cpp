@@ -1,6 +1,5 @@
 #include "DMAnalysis.h"
 
-#include <sys/stat.h>
 #include <iostream>
 #include <sstream>
 #include <regex>
@@ -20,12 +19,10 @@
 // Header files for the classes stored in the TTree if any.
 #include "ExRootClasses.h"
 #include "TClonesArray.h"
-#include "TObject.h"
 
 // Detector sensitivity headers
 #include "Particle.h"
 #include "Random.h"
-#include "Kinematics.h"
 #include "DUNEdet.h"
 #include "DMElscattering.h"
 
@@ -110,7 +107,7 @@ int DMAnalysis::DMParameters(const std::string& filen, double& vpmass, double& c
 ////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////
 
-StatisticsAnalysis::StatisticsAnalysis()
+StatisticsAnalysis::StatisticsAnalysis() = default
 {
 }
 
@@ -131,29 +128,25 @@ StatisticsAnalysis::~StatisticsAnalysis()
 void StatisticsAnalysis::Init()
 {
 	index = 0;
-    graphchi2 = new TGraph2D(files.size());
+    graphchi2 = new TGraph2D((int)files.size());
     graphchi2->SetName("chi2");
     graphchi2->SetTitle("Dark Matter #chi^{2};VP mass(GeV);#chi mass(GeV);#chi^{2}");
 
-    graphsig = new TGraph2D(files.size());
+    graphsig = new TGraph2D((int)files.size());
     graphsig->SetName("signal");
     graphsig->SetTitle("Signal;VP mass(GeV);#chi mass(GeV);Counts");
 
-    graphbg = new TGraph2D(files.size());
+    graphbg = new TGraph2D((int)files.size());
     graphbg->SetName("bg");
     graphbg->SetTitle("Background;VP mass(GeV);#chi mass(GeV);Counts");
 	
-	graphdmee = new TGraph2D(files.size());
+	graphdmee = new TGraph2D((int)files.size());
 	graphdmee->SetName("dmee");
 	graphdmee->SetTitle("Electron Scatter E against dm Mean;VP mass(GeV);#chi mass(GeV);E(GeV)");
-	
-	Kinematics kin;
+
 	DUNEDetector det;
 	DMscattering scatter;
-	
-	int scatterCount = 0;
-	int Nscatter = 0;
-	int Nelectron = 0;
+
 	double probMax = 10e-15;
 	
     neutrino_electron_e = new TH1D("nuee3","Nu-Electron Scatter E;E (GeV)", 100, 0, 6);
@@ -177,7 +170,7 @@ void StatisticsAnalysis::Init()
     int neutrino_total = 5000000;
     double total_weight = 0;
     std::cout << "Generating neutrino distribution...\n";
-    for(Int_t i = 0, j = 0; j < neutrino_total; i=(i+1)%neutrino_entries, ++j) {
+    for(long long i = 0, j = 0; j < neutrino_total; i=(i+1)%neutrino_entries, ++j) {
         neutrino_tree->GetEvent(i);
         Particle neutrino(0);
         Particle electron(emass);
@@ -220,8 +213,7 @@ void StatisticsAnalysis::Analyze(const std::string& filen)
 	double vpmass, chimass, kappa, alpha;
 	if(DMParameters(filen, vpmass, chimass, kappa, alpha)) return;
 	std::cout << filen << std::endl;
-	
-	Kinematics kin;
+
 	DUNEDetector det;
 	DMscattering scatter;
 	
@@ -354,7 +346,10 @@ void DarkMatterDistribution::Init()
 	switch(pdgCode)
 	{
 		case 33:
-		title << "#chi ";
+		    title << "#chi ";
+            break;
+        default:
+            break;
 	}
 	
 	if(attr == "px")
@@ -512,7 +507,6 @@ void DetectorAnalysis::Analyze(const std::string& filen)
 	double vpmass, chimass, kappa, alpha;
 	if(DMParameters(filen, vpmass, chimass, kappa, alpha)) return;
 
-    Kinematics kin;
 	DUNEDetector det;
 	DMscattering scatter;
 	
@@ -569,7 +563,7 @@ void DetectorAnalysis::Analyze(const std::string& filen)
     int neutrino_intersectcount = 0;
     int neutrino_scattercount = 0;
     double total_weight = 0;
-    for(Int_t i = 0, j = 0; j < nentries*5; i=(i+1)%neutrino_entries, ++j) {
+    for(long long i = 0, j = 0; j < nentries*5; i=(i+1)%neutrino_entries, ++j) {
         neutrino_tree->GetEvent(i);
         Particle neutrino(0);
         Particle electron(emass);
@@ -616,11 +610,11 @@ void DetectorAnalysis::Analyze(const std::string& filen)
 	TClonesArray* array = new TClonesArray("TRootLHEFParticle", 5);
 	branch->SetAddress(&array);
 
-    Particle darkphoton(vpmass);
+    //Particle darkphoton(vpmass);
     Particle darkmatter1(chimass);
-    Particle darkmatter2(chimass);
+    //Particle darkmatter2(chimass);
     Particle electron1(emass);
-    Particle electron2(emass);
+    //Particle electron2(emass);
 
     for(Int_t i = 0; i < nentries; ++i)
     {
