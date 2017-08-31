@@ -12,6 +12,6 @@ public:
 	double Lenter (double);
 	double Lexit (double);
 	double Ldet (Particle &DM);
-	void intersect (int &, int &, Particle&);
+	bool intersect (double dx, double dy, double dz, double& tmin, double& tmax);
 };
 

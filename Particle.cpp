@@ -1,6 +1,7 @@
 #include <cmath>
 
 #include "Particle.h"
+#include <algorithm>
 
 Particle::Particle(double mass){
 	m = mass;
@@ -66,4 +67,9 @@ void Particle::Lorentz(Particle parent){
 	p3z  = Lam41*E2+Lam42*p2x+Lam43*p2y+Lam44*p2z;
 		
 	FourMomentum(p3x, p3y, p3z, E3);
+}
+
+void Particle::getNorm(double &len, double &x, double &y, double &z) {
+    len = sqrt(px*px+py*py+pz*pz);
+    x = px/len; y = py/len; z = pz/len;
 }

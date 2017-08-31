@@ -6,8 +6,6 @@
 #include "DMElscattering.h"
 #include "Particle.h"
 #include "Random.h"
-#include "Kinematics.h"
-#include "DUNEdet.h"
 
 
 DMscattering::DMscattering() {
@@ -124,9 +122,9 @@ double DMscattering::sigma (double EDM, double MDM, double MDP, double kappa, do
 	return(rsig);
 }
 //
-void DMscattering::probscatter (int &dswitch, int &Nscat, double &pMax, double MDP, double MDM, double kap, double alD, Particle& DM) {
+void DMscattering::probscatter (int &dswitch, int &Nscat, double &pMax, double MDP, double MDM, double kap, double alD, Particle& DM, double LXdet) {
 	double pscat, Rscat;
-	double LXdet, XS;
+	double XS;
 	double prob;
 	double pMax0 = 1.0e-10;
 	double ne = 5.1e+23;
@@ -135,12 +133,8 @@ void DMscattering::probscatter (int &dswitch, int &Nscat, double &pMax, double M
 	convGeV2cm2 = 3.89e-28;
 	convmcm = 100.0;
 	pscat = Random::Flat(0,1);
-	Kinematics kin;
-	DUNEDetector det;
 	if (dswitch == 1)
 	{
-
-		LXdet = det.Ldet(DM);
 		LXdet = LXdet*convmcm;
 		XS = sigma(DM.E,MDM,MDP,kap,alD);
 		XS = XS*convGeV2cm2;
@@ -166,9 +160,9 @@ void DMscattering::probscatter (int &dswitch, int &Nscat, double &pMax, double M
 
 }
 
-void DMscattering::probscatterNeutrino (int &dswitch, int &Nscat, double &pMax, Particle& DM) {
+void DMscattering::probscatterNeutrino (int &dswitch, int &Nscat, double &pMax, Particle& DM, double LXdet) {
 	double pscat, Rscat;
-	double LXdet, XS;
+	double XS;
 	double prob;
 	double pMax0 = 1.0e-14;
 	double ne = 5.1e+23;
@@ -177,12 +171,8 @@ void DMscattering::probscatterNeutrino (int &dswitch, int &Nscat, double &pMax, 
 	convGeV2cm2 = 1e-42;
 	convmcm = 100.0;
 	pscat = Random::Flat(0,1);
-	Kinematics kin;
-	DUNEDetector det;
 	if (dswitch == 1)
 	{
-
-		LXdet = det.Ldet(DM);
 		LXdet = LXdet*convmcm;
         XS = nuSigma(DM.E);
         if(XS < 0) return;

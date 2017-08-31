@@ -132,14 +132,8 @@ double DUNEDetector::Ldet (Particle &DM) {
     }
 }
 //
-void DUNEDetector::intersect(int &dswitch, int &Ndm, Particle &DM){
-	double pLen = sqrt(DM.px*DM.px+DM.py*DM.py+DM.pz*DM.pz);
-    double tmin = 0, tmax = 0;
-    if(intersectAABB(0, 0, 0, DM.px/pLen, DM.py/pLen, DM.pz/pLen, minsx, minsy, minsz, maxsx, maxsy, maxsz, tmin, tmax))
-	{
-		dswitch = 1;
-		Ndm = Ndm+1;
-	}		
+bool DUNEDetector::intersect(double dx, double dy, double dz, double& tmin, double& tmax){
+    return intersectAABB(0, 0, 0, dx, dy, dz, minsx, minsy, minsz, maxsx, maxsy, maxsz, tmin, tmax);
 }
 
 DUNEDetector::DUNEDetector():
