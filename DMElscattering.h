@@ -3,11 +3,6 @@
 
 class Particle;
 class DMscattering {
-
-	double Ee, Thetael;
-	double EDM, MDM;
-	double MDP;
-	double kappa, alphaD;
     std::vector<double> neutrino_sigma, neutrino_energy;
 public:
     DMscattering();
@@ -18,11 +13,10 @@ public:
 	double dsigmadEe (double,double,double,double,double,double);
 	double F2 (double,double,double,double);
 	double sigma (double,double,double,double,double);
-	void probscatter(int &,int &,double &,double,double,double,double,Particle&,double LXdet);
-	void scatterevent(int &,int &,double,double,double,double,Particle&,Particle &);
-	void probscatterNeutrino(int &dswitch, int &Nscat, double &pMax, Particle &DM, double LXdet);
-
-	void scattereventNeutrino(int &dswitch, int &Nelec, Particle &DM, Particle &electron);
+	bool probscatter(double &,double,double,double,double,Particle&,double LXdet);
+	void scatterevent(double,double,double,double,Particle&,Particle &);
+	bool probscatterNeutrino(double &pMax, Particle &DM, double LXdet);
+	void scattereventNeutrino(Particle &DM, Particle &electron);
 
     double nudSigmadEe(double nE, double theta);
 

@@ -122,7 +122,7 @@ double DMscattering::sigma (double EDM, double MDM, double MDP, double kappa, do
 	return(rsig);
 }
 //
-void DMscattering::probscatter (int &dswitch, int &Nscat, double &pMax, double MDP, double MDM, double kap, double alD, Particle& DM, double LXdet) {
+bool DMscattering::probscatter (double &pMax, double MDP, double MDM, double kap, double alD, Particle& DM, double LXdet) {
 	double pscat, Rscat;
 	double XS;
 	double prob;
@@ -133,34 +133,25 @@ void DMscattering::probscatter (int &dswitch, int &Nscat, double &pMax, double M
 	convGeV2cm2 = 3.89e-28;
 	convmcm = 100.0;
 	pscat = Random::Flat(0,1);
-	if (dswitch == 1)
-	{
-		LXdet = LXdet*convmcm;
-		XS = sigma(DM.E,MDM,MDP,kap,alD);
-		XS = XS*convGeV2cm2;
-		//std::cout<<DM.E<<"\t"<<(XS*pow(10,39))<<std::endl;
 
-		prob = XS*ne*LXdet;
+    LXdet = LXdet*convmcm;
+    XS = sigma(DM.E,MDM,MDP,kap,alD);
+    XS = XS*convGeV2cm2;
+    //std::cout<<DM.E<<"\t"<<(XS*pow(10,39))<<std::endl;
 
-		if (prob > pMax0)
-		{
-			pMax = prob;
+    prob = XS*ne*LXdet;
 
-		}
-		Rscat = prob/pMax0;
+    if (prob > pMax0)
+    {
+        pMax = prob;
 
-		if (Rscat > pscat)
-		{
-			Nscat = Nscat+1;
-			dswitch = 2;
+    }
+    Rscat = prob/pMax0;
 
-		}
-	}
-
-
+    return Rscat > pscat;
 }
 
-void DMscattering::probscatterNeutrino (int &dswitch, int &Nscat, double &pMax, Particle& DM, double LXdet) {
+bool DMscattering::probscatterNeutrino (double &pMax, Particle& DM, double LXdet) {
 	double pscat, Rscat;
 	double XS;
 	double prob;
@@ -171,36 +162,27 @@ void DMscattering::probscatterNeutrino (int &dswitch, int &Nscat, double &pMax, 
 	convGeV2cm2 = 1e-42;
 	convmcm = 100.0;
 	pscat = Random::Flat(0,1);
-	if (dswitch == 1)
-	{
-		LXdet = LXdet*convmcm;
-        XS = nuSigma(DM.E);
-        if(XS < 0) return;
-		XS = XS*convGeV2cm2;
-		//std::cout<<DM.E<<"\t"<<(XS*pow(10,39))<<std::endl;
-                 //std::cout<<"XS is"<<XS<<std::endl;
-		prob = XS*ne*LXdet;
-        
-                //std::cout<<"Prob is"<<prob<<std::endl;
-		if (prob > pMax0)
-		{
-			pMax = prob;
 
-		}
-		Rscat = prob/pMax0;
+    LXdet = LXdet*convmcm;
+    XS = nuSigma(DM.E);
+    if(XS < 0) return false;
+    XS = XS*convGeV2cm2;
+    //std::cout<<DM.E<<"\t"<<(XS*pow(10,39))<<std::endl;
+             //std::cout<<"XS is"<<XS<<std::endl;
+    prob = XS*ne*LXdet;
 
-		if (Rscat > pscat)
-		{
-			Nscat = Nscat+1;
-			dswitch = 2;
+            //std::cout<<"Prob is"<<prob<<std::endl;
+    if (prob > pMax0)
+    {
+        pMax = prob;
 
-		}
-	}
+    }
+    Rscat = prob/pMax0;
 
-
+    return Rscat > pscat;
 }
 //
-void DMscattering::scatterevent (int &dswitch, int &Nelec, double MDP, double MDM, double kap, double alD, Particle& DM, Particle &electron) {
+void DMscattering::scatterevent (double MDP, double MDM, double kap, double alD, Particle& DM, Particle &electron) {
     double Pi = 3.141592653589793;
     double Me = 0.000511;
     double EeMin, EeMax;
@@ -209,47 +191,35 @@ void DMscattering::scatterevent (int &dswitch, int &Nelec, double MDP, double MD
     double dsig, sig, psig;
     double dsigMax, psigMax;
     double probe, Re;
-    int eswitch;
-    //std::cout <<"value is" << pex <<"\t"<< pey <<"\t"<< pez <<"\t"<< Ee <<std::endl;
-    if (dswitch == 2)
-    {
+    EeMax = EeTMax(DM.E,MDM);
+    EeMin = EeTMin(DM.E,MDM);
+    sig = sigma(DM.E,MDM,MDP,kap,alD);
+    dsigMax = dsigmadEe(EeMin,DM.E,MDM,MDP,kap,alD);
+    psigMax =(EeMax-EeMin)*dsigMax/sig;
 
+    while (1) {
+        probe = Random::Flat(0, 1);
+        xe = Random::Flat(0, 1);
+        Thetae = xe * Pi / 2;
 
-        eswitch = 0;
-        EeMax = EeTMax(DM.E,MDM);
-        EeMin = EeTMin(DM.E,MDM);
-        sig = sigma(DM.E,MDM,MDP,kap,alD);
-        dsigMax = dsigmadEe(EeMin,DM.E,MDM,MDP,kap,alD);
-        psigMax =(EeMax-EeMin)*dsigMax/sig;
-
-        while (eswitch == 0)
-        {
-            probe = Random::Flat(0,1);
-            xe = Random::Flat(0,1);
-            Thetae = xe*Pi/2;
-
-            Ee = EeMin + xe*(EeMax-EeMin);
-            dsig = dsigmadEe(Ee,DM.E,MDM,MDP,kap,alD);
-            psig = (EeMax-EeMin)*dsig/sig;
-            Re = psig/psigMax;
-            if (Re > probe)
-            {
-                eswitch = 1;
-                ye = Random::Flat(0,1);
-                Phie = ye*2.0*Pi;
-                pe = sqrt(Ee*Ee-Me*Me);
-                pex = pe*sin(Thetae)*cos(Phie);
-                pey = pe*sin(Thetae)*sin(Phie);
-                pez = pe*cos(Thetae);
-                electron.FourMomentum(pex,pey,pez,Ee);
-                Nelec = Nelec+1;
-
-            }
+        Ee = EeMin + xe * (EeMax - EeMin);
+        dsig = dsigmadEe(Ee, DM.E, MDM, MDP, kap, alD);
+        psig = (EeMax - EeMin) * dsig / sig;
+        Re = psig / psigMax;
+        if (Re > probe) {
+            ye = Random::Flat(0, 1);
+            Phie = ye * 2.0 * Pi;
+            pe = sqrt(Ee * Ee - Me * Me);
+            pex = pe * sin(Thetae) * cos(Phie);
+            pey = pe * sin(Thetae) * sin(Phie);
+            pez = pe * cos(Thetae);
+            electron.FourMomentum(pex, pey, pez, Ee);
+            break;
         }
     }
 }
 //
-void DMscattering::scattereventNeutrino (int &dswitch, int &Nelec, Particle& DM, Particle &electron) {
+void DMscattering::scattereventNeutrino (Particle& DM, Particle &electron) {
     double Pi = 3.141592653589793;
     double convcross2cm2 = 1e-42;
     double Me = 0.000511;
@@ -259,46 +229,40 @@ void DMscattering::scattereventNeutrino (int &dswitch, int &Nelec, Particle& DM,
     double dsig, sig, psig;
     double dsigMax, psigMax;
     double probe, Re;
-    int eswitch;
-    //std::cout <<"value is" << pex <<"\t"<< pey <<"\t"<< pez <<"\t"<< Ee <<std::endl;
-    if (dswitch == 2)
+    EeMax = 2*Me*DM.E*DM.E / (std::pow(Me + DM.E, 2) - DM.E*DM.E);
+    EeMin = 0;
+    sig = nuSigma(DM.E) * convcross2cm2;
+    if(sig<0) return;
+    dsigMax = nudSigmadEe(DM.E, 0);
+
+    const double step = 0.01;
+    double integratedSigma = 0;
+    for(double t = 0; t<=Pi/2; t+=step)
+        integratedSigma += nudSigmadEe(DM.E, t)*step;
+//     std::cout << "Emphirical Sigma: " << sig << "     Estimated Sigma: " << 17.23e-43*DM.E << "    Integrated Sigma: " << integratedSigma << std::endl;
+
+    psigMax =(EeMax-EeMin)*dsigMax/sig;
+
+    while (1)
     {
-        eswitch = 0;
-        EeMax = 2*Me*DM.E*DM.E / (std::pow(Me + DM.E, 2) - DM.E*DM.E);
-        EeMin = 0;
-        sig = nuSigma(DM.E) * convcross2cm2;
-        if(sig<0) return;
-        dsigMax = nudSigmadEe(DM.E, 0);
+        probe = Random::Flat(0,1);
+        xe = Random::Flat(0,1);
+        Thetae = xe*Pi/2;
 
-        const double step = 0.01;
-        double integratedSigma = 0;
-        for(double t = 0; t<=Pi/2; t+=step)
-            integratedSigma += nudSigmadEe(DM.E, t)*step;
-   //     std::cout << "Emphirical Sigma: " << sig << "     Estimated Sigma: " << 17.23e-43*DM.E << "    Integrated Sigma: " << integratedSigma << std::endl;
-
-        psigMax =(EeMax-EeMin)*dsigMax/sig;
-
-        while (eswitch == 0)
+        Ee = EeMin + xe*(EeMax-EeMin);
+        dsig = nudSigmadEe(DM.E, Thetae);
+        psig = (EeMax-EeMin)*dsig/sig;
+        Re = psig/psigMax;
+        if (Re > probe)
         {
-            probe = Random::Flat(0,1);
-            xe = Random::Flat(0,1);
-            Thetae = xe*Pi/2;
-
-            Ee = EeMin + xe*(EeMax-EeMin);
-            dsig = nudSigmadEe(DM.E, Thetae);
-            psig = (EeMax-EeMin)*dsig/sig;
-            Re = psig/psigMax;
-            if (Re > probe)
-            {
-                eswitch = 1;
-                ye = Random::Flat(0,1);
-                Phie = ye*2.0*Pi;
-                pe = sqrt(Ee*Ee-Me*Me);
-                pex = pe*sin(Thetae)*cos(Phie);
-                pey = pe*sin(Thetae)*sin(Phie);
-                pez = pe*cos(Thetae);
-                electron.FourMomentum(pex,pey,pez,Ee);
-            }
+            ye = Random::Flat(0,1);
+            Phie = ye*2.0*Pi;
+            pe = sqrt(Ee*Ee-Me*Me);
+            pex = pe*sin(Thetae)*cos(Phie);
+            pey = pe*sin(Thetae)*sin(Phie);
+            pez = pe*cos(Thetae);
+            electron.FourMomentum(pex,pey,pez,Ee);
+            break;
         }
     }
 }

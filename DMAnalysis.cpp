@@ -182,23 +182,24 @@ void StatisticsAnalysis::Init()
         //nupz_1->Fill(neutrino.pz, weight);
         //nue_1->Fill(neutrino.E, weight);
 
-        int Switch = 0;
-        det.intersect(Switch,neutrino_intersectcount,neutrino);
-        if(Switch == 1) {
+        double pLen, dx, dy, dz, tmin, tmax;
+        neutrino.getNorm(pLen, dx, dy, dz);
+        if(det.intersect(dx, dy, dz, tmin, tmax)) {
+
             //nupz_2->Fill(neutrino.pz, weight);
             //nue_2->Fill(neutrino.E, weight);
-        }
-        scatter.probscatterNeutrino(Switch,neutrino_scattercount,probMax,neutrino);
-        scatter.scattereventNeutrino(Switch,neutrino_scattercount,neutrino,electron);
-        if(Switch == 2) {
-            //nupz_3->Fill(neutrino.pz, weight);
-            //nue_3->Fill(neutrino.E, weight);
+            if(scatter.probscatterNeutrino(probMax, neutrino, tmax-tmin)) {
+                scatter.scattereventNeutrino(neutrino, electron);
 
-            //nuepz_3->Fill(electron.pz, weight);
-            neutrino_electron_e->Fill(electron.E, weight);
-            
-			//double pnorm = sqrt(electron.px*electron.px+electron.py*electron.py+electron.pz*electron.pz);
-			//nuetheta_3->Fill(acos(std::min<double>(std::max<double>(electron.pz/pnorm, -1), 1)));
+                //nupz_3->Fill(neutrino.pz, weight);
+                //nue_3->Fill(neutrino.E, weight);
+
+                //nuepz_3->Fill(electron.pz, weight);
+                neutrino_electron_e->Fill(electron.E, weight);
+
+                //double pnorm = sqrt(electron.px*electron.px+electron.py*electron.py+electron.pz*electron.pz);
+                //nuetheta_3->Fill(acos(std::min<double>(std::max<double>(electron.pz/pnorm, -1), 1));
+            }
         }
     }
     double scale = (double)100000/total_weight;
@@ -237,15 +238,16 @@ void StatisticsAnalysis::Analyze(const std::string& filen)
 				Particle darkmatter1(chimass);
 				Particle electron1(emass);
 				darkmatter1.FourMomentum(particle->Px,particle->Py,-particle->Pz,particle->E);
-				
-				int DMSwitch = 0;
-				det.intersect(DMSwitch,scatterCount,darkmatter1);
-				scatter.probscatter(DMSwitch,Nscatter,probMax,vpmass,chimass,kappa,alpha,darkmatter1);
-				scatter.scatterevent(DMSwitch,Nelectron,vpmass,chimass,kappa,alpha,darkmatter1,electron1);
-				if(DMSwitch == 2)
-				{
-					dm_electron_e->Fill(electron1.E);
-				}
+
+                double pLen, dx, dy, dz, tmin, tmax;
+                darkmatter1.getNorm(pLen, dx, dy, dz);
+				if(det.intersect(dx, dy, dz, tmin, tmax)) {
+                    if(scatter.probscatter(probMax, vpmass, chimass, kappa, alpha, darkmatter1, tmax-tmin)) {
+                        scatter.scatterevent(vpmass, chimass, kappa, alpha, darkmatter1,
+                                             electron1);
+                            dm_electron_e->Fill(electron1.E);
+                    }
+                }
 			}
 		}
 	}
@@ -510,15 +512,14 @@ void DetectorAnalysis::Analyze(const std::string& filen)
 	DUNEDetector det;
 	DMscattering scatter;
 	
-	int scatterCount = 0;
-	int Nscatter;
-	int Nelectron;
+	int Nintersect = 0, Nscatter = 0, Nelectron = 0;
 	double probMax = 10e-15;
 	
 	TFile* output = new TFile("output.root", "RECREATE");
     TH1D* dmpz_1 = new TH1D("dmpz1","Dark matter P_{z};P_{z} (GeV/c)", 100, 0, 60);
     TH1D* dme_1 = new TH1D("dme1","Dark matter E;E (GeV)", 100, 0, 60);
     TH1D* dme_v = new TH1D("dmev","Dark matter velocity;Vel (c)", 100, 0, 0);
+    TH1D* dme_time = new TH1D("dmetime","Dark matter arrival time;Time (s)", 100, 0, 0);
     TH1D* dme_t1 = new TH1D("dmet1","Dark matter \\theta;\\theta", 100, 0, 0);
     TH1D* dmpz_2 = new TH1D("dmpz2","Intersected Dark matter P_{z};P_{z} (GeV/c)", 100, 0, 60);
     TH1D* dme_2 = new TH1D("dme2","Intersected Dark matter E;E (GeV)", 100, 0, 60);
@@ -585,23 +586,25 @@ void DetectorAnalysis::Analyze(const std::string& filen)
         nue_t1->Fill(theta, weight);
 
         double tmin = 0, tmax = 0;
-        int Switch = 0;
-        det.intersect(dx, dy, dz, tmin, tmax);
-        if(Switch == 1) {
+        if(det.intersect(dx, dy, dz, tmin, tmax)) {
             nupz_2->Fill(neutrino.pz, weight);
             nue_2->Fill(neutrino.E, weight);
             nue_t2->Fill(theta, weight);
-        }
-        scatter.probscatterNeutrino(Switch,neutrino_scattercount,probMax,neutrino, tmax-tmin);
-        scatter.scattereventNeutrino(Switch,neutrino_scattercount,neutrino,electron);
-        if(Switch == 2) {
-            //nupz_3->Fill(neutrino.pz, weight);
-            //nue_3->Fill(neutrino.E, weight);
 
-            nuepz_3->Fill(electron.pz, weight);
-            nuee_3->Fill(electron.E, weight);
+            if(scatter.probscatterNeutrino(probMax, neutrino, tmax - tmin)) {
+                scatter.scattereventNeutrino(neutrino, electron);
 
-			nuetheta_3->Fill(acos(std::min<double>(std::max<double>(electron.pz/sqrt(electron.px*electron.px+electron.py*electron.py+electron.pz*electron.pz), -1), 1)));
+                //nupz_3->Fill(neutrino.pz, weight);
+                //nue_3->Fill(neutrino.E, weight);
+
+                nuepz_3->Fill(electron.pz, weight);
+                nuee_3->Fill(electron.E, weight);
+
+                nuetheta_3->Fill(acos(std::min<double>(std::max<double>(electron.pz / sqrt(electron.px * electron.px +
+                                                                                  electron.py * electron.py +
+                                                                                      electron.pz * electron.pz),
+                                                                   -1), 1)));
+            }
         }
     }
     double scale = (double)nentries/total_weight;
@@ -642,44 +645,45 @@ void DetectorAnalysis::Analyze(const std::string& filen)
 				dmpz_1->Fill(-particle->Pz);
 				dme_1->Fill(particle->E);
                 dme_t1->Fill(theta);
-                dme_v->Fill(pLen/chimass);
-				
-				int DMSwitch = 0;
-                double tmin = 0, tmax = 0;
 
+                double tmin = 0, tmax = 0;
 				if(det.intersect(dx, dy, dz, tmin, tmax))
 				{
 					dmpz_2->Fill(-particle->Pz);
 					dme_2->Fill(particle->E);
                     dme_t2->Fill(theta);
-				}
-				scatter.probscatter(DMSwitch,Nscatter,probMax,vpmass,chimass,kappa,alpha,darkmatter1,tmax-tmin);
-				scatter.scatterevent(DMSwitch,Nelectron,vpmass,chimass,kappa,alpha,darkmatter1,electron1);
-				if(DMSwitch == 2)
-				{
-					//dmpz_3->Fill(darkmatter1.pz);
-					//dme_3->Fill(darkmatter1.E);
-					
-					//bool thresh = electron1.E < 0.5;
-					epz_3->Fill(electron1.pz);
-					/*if(thresh)*/ ee_3->Fill(electron1.E);
-					double pnorm = sqrt(electron1.px*electron1.px+electron1.py*electron1.py+electron1.pz*electron1.pz);
-					etheta_3->Fill( acos(std::min<double>(std::max<double>(electron1.pz/pnorm, -1), 1)) );
-					
-					double darkmatter1E = darkmatter1.E;
-					double electron1E = electron1.E;
-					
-					if(smear_sigma>0)
-					{
-						darkmatter1.E += Random::Gauss(smear_mean, smear_sigma/sqrt(darkmatter1.E));
-						electron1.E += Random::Gauss(smear_mean, smear_sigma/sqrt(electron1.E));
-						
-						//dme_4->Fill(darkmatter1.E);
-						/*if(thresh)*/ ee_4->Fill(electron1.E);
-						
-						//dme_5->Fill(darkmatter1.E / darkmatter1E);
-						/*if(thresh)*/ ee_5->Fill(electron1.E / electron1E);
-					}
+                    double vel = pLen/particle->E*2.998e8;
+                    dme_v->Fill(vel);
+                    dme_time->Fill(tmin/vel);
+
+				    if(scatter.probscatter(probMax,vpmass,chimass,kappa,alpha,darkmatter1,tmax-tmin)) {
+                        scatter.scatterevent(vpmass, chimass, kappa, alpha, darkmatter1,
+                                             electron1);
+
+                        //dmpz_3->Fill(darkmatter1.pz);
+                        //dme_3->Fill(darkmatter1.E);
+
+                        //bool thresh = electron1.E < 0.5;
+                        epz_3->Fill(electron1.pz);
+                        /*if(thresh)*/ ee_3->Fill(electron1.E);
+                        double pnorm = sqrt(electron1.px * electron1.px + electron1.py * electron1.py +
+                                            electron1.pz * electron1.pz);
+                        etheta_3->Fill(acos(std::min<double>(std::max<double>(electron1.pz / pnorm, -1), 1)));
+
+                        double darkmatter1E = darkmatter1.E;
+                        double electron1E = electron1.E;
+
+                        if (smear_sigma > 0) {
+                            darkmatter1.E += Random::Gauss(smear_mean, smear_sigma / sqrt(darkmatter1.E));
+                            electron1.E += Random::Gauss(smear_mean, smear_sigma / sqrt(electron1.E));
+
+                            //dme_4->Fill(darkmatter1.E);
+                            /*if(thresh)*/ ee_4->Fill(electron1.E);
+
+                            //dme_5->Fill(darkmatter1.E / darkmatter1E);
+                            /*if(thresh)*/ ee_5->Fill(electron1.E / electron1E);
+                        }
+                    }
 				}
 			}
 		}
@@ -689,6 +693,7 @@ void DetectorAnalysis::Analyze(const std::string& filen)
     dmpz_2->BufferEmpty();
     dme_2->BufferEmpty();
     dme_v->BufferEmpty();
+    dme_time->BufferEmpty();
     dme_t1->BufferEmpty();
     dme_t2->BufferEmpty();
     //dmpz_3->BufferEmpty();
@@ -729,6 +734,7 @@ void DetectorAnalysis::Analyze(const std::string& filen)
     saveComparison("nu_dme1", "DM vs Neutrino E", dme_1, nue_1, "Dark matter E", "Neutrino E");
     saveComparison("nu_dmet1", "DM vs Neutrino \\theta", dme_t1, nue_t1, "Dark matter \\theta", "Neutrino \\theta");
     saveComparison("nu_dmet2", "DM vs Neutrino Intersections \\theta", dme_t2, nue_t2, "Dark matter \\theta", "Neutrino \\theta");
+    saveComparison("nu_dmet2", "DM vs Neutrino Intersections \\theta", dme_t2, nue_t2, "Dark matter \\theta", "Neutrino \\theta");
 	saveComparison("nu_dmpz2", "DM vs Neutrino Intersections P_{z}", dmpz_2, nupz_2, "Dark matter P_{z}", "Neutrino P_{z}");
 	saveComparison("nu_dme2", "DM vs Neutrino Intersections E", dme_2, nue_2, "Dark matter E", "Neutrino E");
 	saveComparison("nu_dm_epz", "DM vs Neutrino Electron Scatter P_{z}", epz_3, nuepz_3, "Electron - Dark matter P_{z}", "Electron - Neutrino P_{z}");
@@ -740,6 +746,7 @@ void DetectorAnalysis::Analyze(const std::string& filen)
 	delete dmpz_2;
 	delete dme_2;
     delete dme_v;
+    delete dme_time;
     delete dme_t1;
     delete dme_t2;
 	//delete dmpz_3;
