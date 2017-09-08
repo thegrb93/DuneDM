@@ -32,7 +32,6 @@ int main (int argc, char** argv) {
 			
 		std::map<std::string,DMAnalysis*(*)()> modes = {
 			{"statistics", &StatisticsAnalysis::create},
-			{"histograms", &DarkMatterDistribution::create},
 			{"detector", &DetectorAnalysis::create}
 		};
 

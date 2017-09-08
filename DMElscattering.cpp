@@ -9,7 +9,7 @@
 
 
 DMscattering::DMscattering() {
-    std::ifstream fneutrino("nusec_nc_dat.txt");
+    std::ifstream fneutrino("data/nusec_nc_dat.txt");
     while(fneutrino.good())
     {
         size_t size = neutrino_energy.size();
@@ -141,12 +141,11 @@ bool DMscattering::probscatter (double &pMax, double MDP, double MDM, double kap
 
     prob = XS*ne*LXdet;
 
-    if (prob > pMax0)
+    if (prob > pMax)
     {
         pMax = prob;
-
     }
-    Rscat = prob/pMax0;
+    Rscat = prob/pMax;
 
     return Rscat > pscat;
 }

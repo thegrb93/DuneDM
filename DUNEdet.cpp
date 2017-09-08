@@ -137,7 +137,7 @@ bool DUNEDetector::intersect(double dx, double dy, double dz, double& tmin, doub
 }
 
 DUNEDetector::DUNEDetector():
-posx(0), posy(0), posz(500)
+posx(0), posy(0), posz(570)
 {
     double width = 3.5, height = 3.5, depth = 6.4;
     minsx = posx - width/2;

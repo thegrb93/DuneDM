@@ -15,6 +15,7 @@
 #include <TLegend.h>
 #include <fstream>
 #include <TApplication.h>
+#include <sys/stat.h>
 
 // Header files for the classes stored in the TTree if any.
 #include "ExRootClasses.h"
@@ -72,8 +73,8 @@ int DMAnalysis::Process()
 	return 0;
 }
 
-std::regex param_match(".+?_([\\d\\.]+)_([\\d\\.]+)_([\\d\\.]+)_([\\d\\.]+)\\.root");
-int DMAnalysis::DMParameters(const std::string& filen, double& vpmass, double& chimass, double& kappa, double& alpha)
+std::regex param_match(".+?_([\\d\\.]+)_([\\d\\.]+)_([\\d\\.]+)_([\\d\\.]+).*");
+int DMParameters(const std::string& filen, double& vpmass, double& chimass, double& kappa, double& alpha/*, double& xsection*/)
 {
 	std::smatch matches;
 	if(!std::regex_match(filen, matches, param_match)) goto error;
@@ -91,10 +92,14 @@ int DMAnalysis::DMParameters(const std::string& filen, double& vpmass, double& c
 		parser << matches[3];
 		parser >> kappa;
 		if(parser.bad()) goto error;
-		parser.clear();
-		parser << matches[4];
-		parser >> alpha;
-		if(parser.bad()) goto error;
+        parser.clear();
+        parser << matches[4];
+        parser >> alpha;
+        if(parser.bad()) goto error;
+        /*parser.clear();
+        parser << matches[5];
+        parser >> xsection;
+        if(parser.bad()) goto error;*/
 		return 0;
 	}
 	
@@ -147,10 +152,10 @@ void StatisticsAnalysis::Init()
 	DUNEDetector det;
 	DMscattering scatter;
 
-	double probMax = 10e-15;
+	double probMax = 1e-15;
 	
     neutrino_electron_e = new TH1D("nuee3","Nu-Electron Scatter E;E (GeV)", 100, 0, 6);
-	TFile* neutrinos = new TFile("g4lbne_nudata.root");
+	TFile* neutrinos = new TFile("data/g4lbne_nudata.root");
     TTree* neutrino_tree = (TTree*)neutrinos->Get("nudata");
     neutrino_tree->SetMakeClass(1);
     float ndxdz, ndydz, ndz;
@@ -217,11 +222,7 @@ void StatisticsAnalysis::Analyze(const std::string& filen)
 
 	DUNEDetector det;
 	DMscattering scatter;
-	
-	int scatterCount = 0;
-	int Nscatter = 0;
-	int Nelectron = 0;
-	double probMax = 10e-15;
+	double probMax = 1e-15;
 	
 	TH1D* dm_electron_e = new TH1D("dme","DM-Electron Scatter E;E (GeV)", 100, 0, 6);
 	TClonesArray* array = new TClonesArray("TRootLHEFParticle", 5);
@@ -310,115 +311,6 @@ void StatisticsAnalysis::UnInit()
 ////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////
 
-DarkMatterDistribution::DarkMatterDistribution()
-{
-}
-
-DMAnalysis* DarkMatterDistribution::create()
-{
-	return new DarkMatterDistribution();
-}
-
-DarkMatterDistribution::~DarkMatterDistribution()
-{
-	delete histo;
-	delete output;
-}
-
-void DarkMatterDistribution::Init()
-{
-	std::string particle, attr;
-	//if(gOptions[OPT_PARTICLE])
-	//	particle = std::string(gOptions[OPT_PARTICLE].last()->arg);
-	//else
-		particle = "33";
-	//if(gOptions[OPT_PARTICLEATTRIBUTE])
-    //	attr = std::string(gOptions[OPT_PARTICLEATTRIBUTE].last()->arg);
-	//else
-		attr = "px";
-	
-	output = new TFile("out.root","RECREATE");
-	
-	std::stringstream parser;
-	parser << particle;
-	parser >> pdgCode;
-	if(parser.bad()){std::cout << "Error parsing requested particle pdgCode: " << particle << std::endl;}
-	
-	std::stringstream title;
-	switch(pdgCode)
-	{
-		case 33:
-		    title << "#chi ";
-            break;
-        default:
-            break;
-	}
-	
-	if(attr == "px")
-	{
-		attribute = &TRootLHEFParticle::Px;
-		title << "p_{x};p_{x}(GeV/c)";
-	}
-	else if(attr == "py")
-	{
-		attribute = &TRootLHEFParticle::Py;
-		title << "p_{y};p_{y}(GeV/c)";
-	}
-	else if(attr == "pz")
-	{
-		attribute = &TRootLHEFParticle::Pz;
-		title << "p_{z};p_{z}(GeV/c)";
-	}
-	else if(attr == "e")
-	{
-		attribute = &TRootLHEFParticle::E;
-		title << "Energy;E(GeV)";
-	}
-	else if(attr == "m")
-	{
-		attribute = &TRootLHEFParticle::M;
-		title << "Mass;M(GeV)";
-	}
-	else
-	{
-		attribute = 0;
-		std::cout << "Invalid attribute: " << attr << std::endl;
-	}
-	
-	histo = new TH1D("Particle",title.str().c_str(),100,0,0);
-}
-
-void DarkMatterDistribution::Analyze(const std::string& filen)
-{
-	if(!attribute){std::cout << "Tried to fill histogram with invalid attribute.\n";}
-	TClonesArray* array = new TClonesArray("TRootLHEFParticle", 5);
-	branch->SetAddress(&array);
-		
-	for(Int_t i = 0; i < nentries; ++i)
-	{
-		branch->GetEntry(i);
-		for(Int_t j = 0; j < array->GetEntries(); ++j)
-		{
-			TRootLHEFParticle* particle = (TRootLHEFParticle*)array->At(j);
-			if(particle->PID==pdgCode)
-			{
-				histo->Fill(particle->*attribute);
-			}
-		}
-	}
-	histo->BufferEmpty();
-	delete array;
-}
-
-void DarkMatterDistribution::UnInit()
-{
-	output->Write(); 
-}
-
-////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////
-
 DetectorAnalysis::DetectorAnalysis()
 {
 }
@@ -456,14 +348,131 @@ void DetectorAnalysis::Init()
 		smear_mean = 0;*/
 	
 	smear_sigma = 0.06;
+
+    DUNEDetector det;
+    DMscattering scatter;
+
+    double probMax = 1e-15;
+
+    output = new TFile("output.root", "RECREATE");
+    dmpz_1 = new TH1D("dmpz1","Dark matter P_{z};P_{z} (GeV/c)", 100, 0, 60);
+    dmpt_1 = new TH1D("dmpt1","Dark matter P_{t};P_{t} (GeV/c)", 100, 0, 0);
+    dme_1 = new TH1D("dme1","Dark matter E;E (GeV)", 100, 0, 60);
+    dme_v = new TH1D("dmev","Dark matter velocity;Vel (m/s)", 100, 2.5e8, 3e8);
+    dme_time = new TH1D("dmetime","Dark matter arrival time;Time (s)", 100, 1.9e-6, 2.5e-6);
+    dme_t1 = new TH1D("dmet1","Dark matter \\theta;\\theta", 100, 0, M_PI);
+    dmpz_2 = new TH1D("dmpz2","Dark matter in Detector P_{z};P_{z} (GeV/c)", 100, 0, 60);
+    dmpt_2 = new TH1D("dmpt2","Dark matter in Detector P_{t};P_{t} (GeV/c)", 100, 0, 0);
+    dme_2 = new TH1D("dme2","Dark matter in Detector E;E (GeV)", 100, 0, 60);
+    dme_t2 = new TH1D("dmet2","Dark matter in Detector \\theta;\\theta", 100, 0, 0);
+    //dmpz_3 = new TH1D("dmpz3","Dark matter Scatter P_{z};P_{z} (GeV/c)", 100, 0, 0);
+    //dme_3 = new TH1D("dme3","Dark matter Scatter E;E (GeV)", 100, 0, 0);
+    //dme_4 = new TH1D("dme4","Dark matter Smeared Scatter E;E (GeV)", 100, 0, 0);
+    //dme_5 = new TH1D("dme5","Dark matter Scatter Energy Smearing Ratio;E (GeV)", 100, 0, 0);
+
+    nupz_1 = new TH1D("nupz1","Neutrino P_{z};P_{z} (GeV/c)", 100, 0, 60);
+    nupt_1 = new TH1D("nupt1","Neutrino P_{t};P_{t} (GeV/c)", 100, 0, 0);
+    nue_1 = new TH1D("nue1","Neutrino E;E (GeV)", 100, 0, 60);
+    nue_t1 = new TH1D("nuet1","Neutrino \\theta;\\theta", 100, 0, M_PI);
+    nupz_2 = new TH1D("nupz2","Neutrino in Detector P_{z};P_{z} (GeV/c)", 100, 0, 60);
+    nupt_2 = new TH1D("nupt2","Neutrino in Detector P_{t};P_{t} (GeV/c)", 100, 0, 0);
+    nue_2 = new TH1D("nue2","Neutrino in Detector E;E (GeV)", 100, 0, 60);
+    nue_t2 = new TH1D("nuet2","Neutrino in Detector \\theta;\\theta", 100, 0, 0);
+    //nupz_3 = new TH1D("nupz3","Neutrino Scatter P_{z};P_{z} (GeV/c)", 100, 0, 0);
+    //nue_3 = new TH1D("nue3","Neutrino Scatter E;E (GeV)", 100, 0, 0);
+    //nue_4 = new TH1D("nue4","Neutrino Smeared Scatter E;E (GeV)", 100, 0, 0);
+    //nue_5 = new TH1D("nue5","Neutrino Scatter Energy Smearing Ratio;E (GeV)", 100, 0, 0);
+
+    epz_3 = new TH1D("dmepz3","DM-Electron Scatter P_{z};P_{z} (GeV/c)", 100, 0, 6);
+    ept_3 = new TH1D("dmept3","DM-Electron Scatter P_{t};P_{t} (GeV/c)", 100, 0, 6);
+    etheta_3 = new TH1D("dmetheta","DM-Electron Scatter \\theta;\\theta)", 100, 0, 3.2);
+    ee_3 = new TH1D("dmee3","DM-Electron Scatter E;E (GeV)", 100, 0, 6);
+    ee_4 = new TH1D("dmee4","DM-Electron Smeared Scatter E;E (GeV)", 100, 0, 6);
+    ee_5 = new TH1D("dmee5","DM-Electron Scatter Energy Smearing Ratio;E (GeV)", 40, 0, 6);
+
+    nuepz_3 = new TH1D("nuepz3","Nu-Electron Scatter P_{z};P_{z} (GeV/c)", 100, 0, 6);
+    nuept_3 = new TH1D("nuept3","Nu-Electron Scatter P_{z};P_{z} (GeV/c)", 100, 0, 6);
+    nuetheta_3 = new TH1D("nuetheta","Nu-Electron Scatter \\theta;\\theta)", 100, 0, 3.2);
+    nuee_3 = new TH1D("nuee3","Nu-Electron Scatter E;E (GeV)", 100, 0, 6);
+    nuee_4 = new TH1D("nuee4","Nu-Electron Smeared Scatter E;E (GeV)", 100, 0, 6);
+    nuee_5 = new TH1D("nuee5","Nu-Electron Scatter Energy Smearing Ratio;E (GeV)", 40, 0, 6);
+
+    /*TFile* neutrinos = new TFile("data/g4lbne_nudata.root");
+    TTree* neutrino_tree = (TTree*)neutrinos->Get("nudata");
+    neutrino_tree->SetMakeClass(1);
+    float ndxdz, ndydz, ndz, ne;
+    double Nimpwt;
+    double NWtNear[5];
+    neutrino_tree->SetBranchAddress("Ndxdz", &ndxdz);
+    neutrino_tree->SetBranchAddress("Ndydz", &ndydz);
+    neutrino_tree->SetBranchAddress("Npz", &ndz);
+    neutrino_tree->SetBranchAddress("Nenergy", &ne);
+    neutrino_tree->SetBranchAddress("Nimpwt", &Nimpwt);
+    neutrino_tree->SetBranchAddress("NWtNear[5]", &NWtNear);
+
+    long long neutrino_entries = neutrino_tree->GetEntries();
+    int neutrino_intersectcount = 0;
+    int neutrino_scattercount = 0;
+    double total_weight = 0;
+    for(long long i = 0, j = 0; j < 10000000; i=(i+1)%neutrino_entries, ++j) {
+        neutrino_tree->GetEvent(i);
+        Particle neutrino(0);
+        Particle electron(emass);
+        double weight = Nimpwt*NWtNear[0];
+        total_weight += weight;
+
+        neutrino.FourMomentum(ndxdz*ndz, ndydz*ndz, ndz, ne);
+        double pLen, dx, dy, dz;
+        neutrino.getNorm(pLen, dx, dy, dz);
+        double pt = sqrt(neutrino.px*neutrino.px+neutrino.py*neutrino.py);
+        double theta = acos(std::min<double>(std::max<double>(dz, -1), 1));
+
+        nupz_1->Fill(neutrino.pz, weight);
+        nupt_1->Fill(pt, weight);
+        nue_1->Fill(neutrino.E, weight);
+        nue_t1->Fill(theta, weight);
+
+        double tmin = 0, tmax = 0;
+        if(det.intersect(dx, dy, dz, tmin, tmax)) {
+            nupz_2->Fill(neutrino.pz, weight);
+            nupt_2->Fill(pt, weight);
+            nue_2->Fill(neutrino.E, weight);
+            nue_t2->Fill(theta, weight);
+
+            if(scatter.probscatterNeutrino(probMax, neutrino, tmax - tmin)) {
+                scatter.scattereventNeutrino(neutrino, electron);
+
+                //nupz_3->Fill(neutrino.pz, weight);
+                //nue_3->Fill(neutrino.E, weight);
+
+                nuepz_3->Fill(electron.pz, weight);
+                nuept_3->Fill(sqrt(electron.px*electron.px+electron.py*electron.py), weight);
+                nuee_3->Fill(electron.E, weight);
+
+                nuetheta_3->Fill(acos(std::min<double>(std::max<double>(electron.pz / sqrt(electron.px * electron.px +
+                                                                                           electron.py * electron.py +
+                                                                                           electron.pz * electron.pz),
+                                                                        -1), 1)));
+            }
+        }
+    }
+    double scale = (double)10000000/total_weight;
+    nupz_1->Scale(scale);
+    nue_1->Scale(scale);
+    nupz_2->Scale(scale);
+    nue_2->Scale(scale);
+    nuepz_3->Scale(scale);
+    nuept_3->Scale(scale);
+    nuee_3->Scale(scale);
+    */
 }
 
-void DetectorAnalysis::saveComparison(const char* savename, const char* canvastitle, TH1D* hist1, TH1D* hist2, const char* histn1, const char* histn2)
+void saveComparison(TCanvas* canvas, const char* savename, const char* canvastitle, TH1D* hist1, TH1D* hist2, const char* histn1, const char* histn2)
 {
-    TCanvas* nu_dm1 = new TCanvas("c1",canvastitle,1024,1024);
-    nu_dm1->SetFillColor(33);
-	nu_dm1->SetFrameFillColor(17);
-	nu_dm1->SetGrid();
+    canvas->SetFillColor(33);
+	canvas->SetFrameFillColor(17);
+	canvas->SetGrid();
+    canvas->SetLogy(0);
 
     THStack *hs = new THStack("hs",canvastitle);
     
@@ -491,17 +500,25 @@ void DetectorAnalysis::saveComparison(const char* savename, const char* canvasti
 	legend->AddEntry(hist2,histn2);
 	legend->Draw();
 	
-	nu_dm1->Update();
-	//nu_dm1->Draw();
-	nu_dm1->SaveAs((std::string(savename)+".png").c_str());
+	canvas->Update();
+	//canvas->Draw();
+	canvas->SaveAs(("histograms/"+std::string(savename)+".png").c_str());
 	
-	nu_dm1->SetLogy();
-	nu_dm1->Update();
-	//nu_dm1->Draw();
-	nu_dm1->SaveAs((std::string(savename)+"_log.png").c_str());
-	
-	delete nu_dm1;
+	canvas->SetLogy();
+	canvas->Update();
+	//canvas->Draw();
+	canvas->SaveAs(("histograms/"+std::string(savename)+"_log.png").c_str());
+
 	delete legend;
+}
+
+void saveHistogram(TCanvas* canvas, TH1D* hist)
+{
+    std::stringstream filen;
+    filen << "histograms/" << hist->GetName() << ".png";
+    hist->Draw();
+    canvas->Update();
+    canvas->SaveAs(filen.str().c_str());
 }
 
 void DetectorAnalysis::Analyze(const std::string& filen)
@@ -511,114 +528,7 @@ void DetectorAnalysis::Analyze(const std::string& filen)
 
 	DUNEDetector det;
 	DMscattering scatter;
-	
-	int Nintersect = 0, Nscatter = 0, Nelectron = 0;
-	double probMax = 10e-15;
-	
-	TFile* output = new TFile("output.root", "RECREATE");
-    TH1D* dmpz_1 = new TH1D("dmpz1","Dark matter P_{z};P_{z} (GeV/c)", 100, 0, 60);
-    TH1D* dme_1 = new TH1D("dme1","Dark matter E;E (GeV)", 100, 0, 60);
-    TH1D* dme_v = new TH1D("dmev","Dark matter velocity;Vel (c)", 100, 0, 0);
-    TH1D* dme_time = new TH1D("dmetime","Dark matter arrival time;Time (s)", 100, 0, 0);
-    TH1D* dme_t1 = new TH1D("dmet1","Dark matter \\theta;\\theta", 100, 0, 0);
-    TH1D* dmpz_2 = new TH1D("dmpz2","Intersected Dark matter P_{z};P_{z} (GeV/c)", 100, 0, 60);
-    TH1D* dme_2 = new TH1D("dme2","Intersected Dark matter E;E (GeV)", 100, 0, 60);
-    TH1D* dme_t2 = new TH1D("dmet2","Intersected Dark matter \\theta;\\theta", 100, 0, 0);
-    //TH1D* dmpz_3 = new TH1D("dmpz3","Dark matter Scatter P_{z};P_{z} (GeV/c)", 100, 0, 0);
-    //TH1D* dme_3 = new TH1D("dme3","Dark matter Scatter E;E (GeV)", 100, 0, 0);
-    //TH1D* dme_4 = new TH1D("dme4","Dark matter Smeared Scatter E;E (GeV)", 100, 0, 0);
-    //TH1D* dme_5 = new TH1D("dme5","Dark matter Scatter Energy Smearing Ratio;E (GeV)", 100, 0, 0);
-
-    TH1D* nupz_1 = new TH1D("nupz1","Neutrino P_{z};P_{z} (GeV/c)", 100, 0, 60);
-    TH1D* nue_1 = new TH1D("nue1","Neutrino E;E (GeV)", 100, 0, 60);
-    TH1D* nue_t1 = new TH1D("nuet1","Neutrino \\theta;\\theta", 100, 0, 0);
-    TH1D* nupz_2 = new TH1D("nupz2","Intersected Neutrino P_{z};P_{z} (GeV/c)", 100, 0, 60);
-    TH1D* nue_2 = new TH1D("nue2","Intersected Neutrino E;E (GeV)", 100, 0, 60);
-    TH1D* nue_t2 = new TH1D("nuet2","Intersected Neutrino \\theta;\\theta", 100, 0, 0);
-    //TH1D* nupz_3 = new TH1D("nupz3","Neutrino Scatter P_{z};P_{z} (GeV/c)", 100, 0, 0);
-    //TH1D* nue_3 = new TH1D("nue3","Neutrino Scatter E;E (GeV)", 100, 0, 0);
-    //TH1D* nue_4 = new TH1D("nue4","Neutrino Smeared Scatter E;E (GeV)", 100, 0, 0);
-    //TH1D* nue_5 = new TH1D("nue5","Neutrino Scatter Energy Smearing Ratio;E (GeV)", 100, 0, 0);
-
-    TH1D* epz_3 = new TH1D("dmepz3","DM-Electron Scatter P_{z};P_{z} (GeV/c)", 100, 0, 6);
-    TH1D* etheta_3 = new TH1D("dmetheta","DM-Electron Scatter \\theta;\\theta)", 100, 0, 3.2);
-    TH1D* ee_3 = new TH1D("dmee3","DM-Electron Scatter E;E (GeV)", 100, 0, 6);
-    TH1D* ee_4 = new TH1D("dmee4","DM-Electron Smeared Scatter E;E (GeV)", 100, 0, 6);
-    TH1D* ee_5 = new TH1D("dmee5","DM-Electron Scatter Energy Smearing Ratio;E (GeV)", 40, 0, 6);
-
-    TH1D* nuepz_3 = new TH1D("nuepz3","Nu-Electron Scatter P_{z};P_{z} (GeV/c)", 100, 0, 6);
-    TH1D* nuetheta_3 = new TH1D("nuetheta","Nu-Electron Scatter \\theta;\\theta)", 100, 0, 3.2);
-    TH1D* nuee_3 = new TH1D("nuee3","Nu-Electron Scatter E;E (GeV)", 100, 0, 6);
-    TH1D* nuee_4 = new TH1D("nuee4","Nu-Electron Smeared Scatter E;E (GeV)", 100, 0, 6);
-    TH1D* nuee_5 = new TH1D("nuee5","Nu-Electron Scatter Energy Smearing Ratio;E (GeV)", 40, 0, 6);
-
-    TFile* neutrinos = new TFile("g4lbne_nudata.root");
-    TTree* neutrino_tree = (TTree*)neutrinos->Get("nudata");
-    neutrino_tree->SetMakeClass(1);
-    float ndxdz, ndydz, ndz, ne;
-    double Nimpwt;
-    double NWtNear[5];
-    neutrino_tree->SetBranchAddress("Ndxdz", &ndxdz);
-    neutrino_tree->SetBranchAddress("Ndydz", &ndydz);
-    neutrino_tree->SetBranchAddress("Npz", &ndz);
-    neutrino_tree->SetBranchAddress("Nenergy", &ne);
-    neutrino_tree->SetBranchAddress("Nimpwt", &Nimpwt);
-    neutrino_tree->SetBranchAddress("NWtNear[5]", &NWtNear);
-
-    long long neutrino_entries = neutrino_tree->GetEntries();
-    int neutrino_intersectcount = 0;
-    int neutrino_scattercount = 0;
-    double total_weight = 0;
-    for(long long i = 0, j = 0; j < nentries*5; i=(i+1)%neutrino_entries, ++j) {
-        neutrino_tree->GetEvent(i);
-        Particle neutrino(0);
-        Particle electron(emass);
-        double weight = Nimpwt*NWtNear[0];
-        total_weight += weight;
-
-        neutrino.FourMomentum(ndxdz*ndz, ndydz*ndz, ndz, ne);
-        double pLen, dx, dy, dz;
-        neutrino.getNorm(pLen, dx, dy, dz);
-        double theta = acos(std::min<double>(std::max<double>(dz, -1), 1));
-
-        nupz_1->Fill(neutrino.pz, weight);
-        nue_1->Fill(neutrino.E, weight);
-        nue_t1->Fill(theta, weight);
-
-        double tmin = 0, tmax = 0;
-        if(det.intersect(dx, dy, dz, tmin, tmax)) {
-            nupz_2->Fill(neutrino.pz, weight);
-            nue_2->Fill(neutrino.E, weight);
-            nue_t2->Fill(theta, weight);
-
-            if(scatter.probscatterNeutrino(probMax, neutrino, tmax - tmin)) {
-                scatter.scattereventNeutrino(neutrino, electron);
-
-                //nupz_3->Fill(neutrino.pz, weight);
-                //nue_3->Fill(neutrino.E, weight);
-
-                nuepz_3->Fill(electron.pz, weight);
-                nuee_3->Fill(electron.E, weight);
-
-                nuetheta_3->Fill(acos(std::min<double>(std::max<double>(electron.pz / sqrt(electron.px * electron.px +
-                                                                                  electron.py * electron.py +
-                                                                                      electron.pz * electron.pz),
-                                                                   -1), 1)));
-            }
-        }
-    }
-    double scale = (double)nentries/total_weight;
-    nupz_1->Scale(scale);
-    nue_1->Scale(scale);
-    nupz_2->Scale(scale);
-    nue_2->Scale(scale);
-    nuepz_3->Scale(scale);
-    nuee_3->Scale(scale);
-    
-    std::cout << nupz_1->Integral() << " " << nue_1->Integral() << " " << nupz_2->Integral() << " " << nue_2->Integral() << " " << nuepz_3->Integral() << " " << nuee_3->Integral() << std::endl;
-    std::cout << "Neutrino intersections: (" << neutrino_intersectcount << " / " << nentries << ")\n";
-    std::cout << "Neutrino scatters: (" << neutrino_scattercount << " / " << neutrino_intersectcount << ")\n";
-
+	double probMax = 1e-10;
 
 	TClonesArray* array = new TClonesArray("TRootLHEFParticle", 5);
 	branch->SetAddress(&array);
@@ -641,8 +551,10 @@ void DetectorAnalysis::Analyze(const std::string& filen)
                 double pLen, dx, dy, dz;
                 darkmatter1.getNorm(pLen, dx, dy, dz);
                 double theta = acos(std::min<double>(std::max<double>(dz, -1), 1));
+                double pt = sqrt(darkmatter1.px*darkmatter1.px+darkmatter1.py*darkmatter1.py);
 
 				dmpz_1->Fill(-particle->Pz);
+                dmpt_1->Fill(pt);
 				dme_1->Fill(particle->E);
                 dme_t1->Fill(theta);
 
@@ -650,6 +562,7 @@ void DetectorAnalysis::Analyze(const std::string& filen)
 				if(det.intersect(dx, dy, dz, tmin, tmax))
 				{
 					dmpz_2->Fill(-particle->Pz);
+                    dmpt_2->Fill(pt);
 					dme_2->Fill(particle->E);
                     dme_t2->Fill(theta);
                     double vel = pLen/particle->E*2.998e8;
@@ -665,6 +578,7 @@ void DetectorAnalysis::Analyze(const std::string& filen)
 
                         //bool thresh = electron1.E < 0.5;
                         epz_3->Fill(electron1.pz);
+                        ept_3->Fill(sqrt(electron1.px*electron1.px+electron1.py*electron1.py));
                         /*if(thresh)*/ ee_3->Fill(electron1.E);
                         double pnorm = sqrt(electron1.px * electron1.px + electron1.py * electron1.py +
                                             electron1.pz * electron1.pz);
@@ -688,9 +602,17 @@ void DetectorAnalysis::Analyze(const std::string& filen)
 			}
 		}
 	}
+	delete array;
+}
+
+void DetectorAnalysis::UnInit()
+{
+
     dmpz_1->BufferEmpty();
+    dmpt_1->BufferEmpty();
     dme_1->BufferEmpty();
     dmpz_2->BufferEmpty();
+    dmpt_2->BufferEmpty();
     dme_2->BufferEmpty();
     dme_v->BufferEmpty();
     dme_time->BufferEmpty();
@@ -712,50 +634,98 @@ void DetectorAnalysis::Analyze(const std::string& filen)
     //nue_5->BufferEmpty();
 
     epz_3->BufferEmpty();
+    ept_3->BufferEmpty();
     etheta_3->BufferEmpty();
     ee_3->BufferEmpty();
     ee_4->BufferEmpty();
     ee_5->BufferEmpty();
     nuepz_3->BufferEmpty();
+    nuept_3->BufferEmpty();
     nuetheta_3->BufferEmpty();
     nuee_3->BufferEmpty();
     nuee_4->BufferEmpty();
     nuee_5->BufferEmpty();
-	
-	double pare[3] = {1,1,1};
-	//TF1 *ge = new TF1("ge","gaus(0)",0.8,1.2);
-	TF1 *ge = new TF1("ge","gaus(0)",ee_5->GetXaxis()->GetXmin(),ee_5->GetXaxis()->GetXmax());
-	ge->SetParameters(pare);
-	ee_5->Fit(ge,"R");
-	
-	output->Write();
-	
-	saveComparison("nu_dmpz1", "DM vs Neutrino P_{z}", dmpz_1, nupz_1, "Dark matter P_{z}", "Neutrino P_{z}");
-    saveComparison("nu_dme1", "DM vs Neutrino E", dme_1, nue_1, "Dark matter E", "Neutrino E");
-    saveComparison("nu_dmet1", "DM vs Neutrino \\theta", dme_t1, nue_t1, "Dark matter \\theta", "Neutrino \\theta");
-    saveComparison("nu_dmet2", "DM vs Neutrino Intersections \\theta", dme_t2, nue_t2, "Dark matter \\theta", "Neutrino \\theta");
-    saveComparison("nu_dmet2", "DM vs Neutrino Intersections \\theta", dme_t2, nue_t2, "Dark matter \\theta", "Neutrino \\theta");
-	saveComparison("nu_dmpz2", "DM vs Neutrino Intersections P_{z}", dmpz_2, nupz_2, "Dark matter P_{z}", "Neutrino P_{z}");
-	saveComparison("nu_dme2", "DM vs Neutrino Intersections E", dme_2, nue_2, "Dark matter E", "Neutrino E");
-	saveComparison("nu_dm_epz", "DM vs Neutrino Electron Scatter P_{z}", epz_3, nuepz_3, "Electron - Dark matter P_{z}", "Electron - Neutrino P_{z}");
-	saveComparison("nu_dm_etheta", "DM vs Neutrino Electron Scatter \\theta", etheta_3, nuetheta_3, "Electron - Dark matter \\theta", "Electron - Neutrino \\theta");
-	saveComparison("nu_dm_ee", "DM vs Neutrino Electron Scatter E", ee_3, nuee_3, "Electron - Dark matter E", "Electron - Neutrino E");
-		
-	delete dmpz_1;
-	delete dme_1;
-	delete dmpz_2;
-	delete dme_2;
+
+    double pare[3] = {1,1,1};
+    //TF1 *ge = new TF1("ge","gaus(0)",0.8,1.2);
+    TF1 *ge = new TF1("ge","gaus(0)",ee_5->GetXaxis()->GetXmin(),ee_5->GetXaxis()->GetXmax());
+    ge->SetParameters(pare);
+    ee_5->Fit(ge,"R");
+
+    output->Write();
+
+    TCanvas* canvas = new TCanvas("c1","canvas",1024,1024);
+    mkdir("histograms", S_IRWXU | S_IRWXG | S_IRWXO);
+    saveHistogram(canvas, dmpz_1);
+    saveHistogram(canvas, dmpt_1);
+    saveHistogram(canvas, dme_1);
+    saveHistogram(canvas, dmpz_2);
+    saveHistogram(canvas, dmpt_2);
+    saveHistogram(canvas, dme_2);
+    saveHistogram(canvas, dme_v);
+    saveHistogram(canvas, dme_time);
+    saveHistogram(canvas, dme_t1);
+    saveHistogram(canvas, dme_t2);
+    //saveHistogram(canvas, dmpz_3);
+    //saveHistogram(canvas, dme_3);
+    //saveHistogram(canvas, dme_4);
+    //saveHistogram(canvas, dme_5);
+    saveHistogram(canvas, nupz_1);
+    saveHistogram(canvas, nupt_1);
+    saveHistogram(canvas, nue_1);
+    saveHistogram(canvas, nupz_2);
+    saveHistogram(canvas, nupt_2);
+    saveHistogram(canvas, nue_2);
+    saveHistogram(canvas, nue_t1);
+    saveHistogram(canvas, nue_t2);
+    //saveHistogram(canvas, nupz_3);
+    //saveHistogram(canvas, nue_3);
+    //saveHistogram(canvas, nue_4);
+    //saveHistogram(canvas, nue_5);
+    saveHistogram(canvas, epz_3);
+    saveHistogram(canvas, ept_3);
+    saveHistogram(canvas, etheta_3);
+    saveHistogram(canvas, ee_3);
+    saveHistogram(canvas, ee_4);
+    saveHistogram(canvas, ee_5);
+    saveHistogram(canvas, nuepz_3);
+    saveHistogram(canvas, nuept_3);
+    saveHistogram(canvas, nuetheta_3);
+    saveHistogram(canvas, nuee_3);
+    saveHistogram(canvas, nuee_4);
+    saveHistogram(canvas, nuee_5);
+
+    saveComparison(canvas, "nu_dmpz1", "DM vs Neutrino P_{z}", dmpz_1, nupz_1, "Dark matter P_{z}", "Neutrino P_{z}");
+    saveComparison(canvas, "nu_dme1", "DM vs Neutrino E", dme_1, nue_1, "Dark matter E", "Neutrino E");
+    saveComparison(canvas, "nu_dmet1", "DM vs Neutrino \\theta", dme_t1, nue_t1, "Dark matter \\theta", "Neutrino \\theta");
+    saveComparison(canvas, "nu_dmet2", "DM vs Neutrino Intersections \\theta", dme_t2, nue_t2, "Dark matter \\theta", "Neutrino \\theta");
+    saveComparison(canvas, "nu_dmet2", "DM vs Neutrino Intersections \\theta", dme_t2, nue_t2, "Dark matter \\theta", "Neutrino \\theta");
+    saveComparison(canvas, "nu_dmpz2", "DM vs Neutrino Intersections P_{z}", dmpz_2, nupz_2, "Dark matter P_{z}", "Neutrino P_{z}");
+    saveComparison(canvas, "nu_dme2", "DM vs Neutrino Intersections E", dme_2, nue_2, "Dark matter E", "Neutrino E");
+    saveComparison(canvas, "nu_dm_epz", "DM vs Neutrino Electron Scatter P_{z}", epz_3, nuepz_3, "Electron - Dark matter P_{z}", "Electron - Neutrino P_{z}");
+    saveComparison(canvas, "nu_dm_ept", "DM vs Neutrino Electron Scatter P_{t}", ept_3, nuept_3, "Electron - Dark matter P_{t}", "Electron - Neutrino P_{t}");
+    saveComparison(canvas, "nu_dm_etheta", "DM vs Neutrino Electron Scatter \\theta", etheta_3, nuetheta_3, "Electron - Dark matter \\theta", "Electron - Neutrino \\theta");
+    saveComparison(canvas, "nu_dm_ee", "DM vs Neutrino Electron Scatter E", ee_3, nuee_3, "Electron - Dark matter E", "Electron - Neutrino E");
+
+    delete dmpz_1;
+    delete dmpt_1;
+    delete dme_1;
+    delete dmpz_2;
+    delete dmpt_2;
+    delete dme_2;
     delete dme_v;
     delete dme_time;
     delete dme_t1;
     delete dme_t2;
-	//delete dmpz_3;
-	//delete dme_3;
-	//delete dme_4;
-	//delete dme_5;
+    //delete dmpz_3;
+    //delete dme_3;
+    //delete dme_4;
+    //delete dme_5;
     delete nupz_1;
+    delete nupt_1;
     delete nue_1;
     delete nupz_2;
+    delete nupt_2;
     delete nue_2;
     delete nue_t1;
     delete nue_t2;
@@ -763,20 +733,17 @@ void DetectorAnalysis::Analyze(const std::string& filen)
     //delete nue_3;
     //delete nue_4;
     //delete nue_5;
-	delete epz_3;
-	delete etheta_3;
-	delete ee_3;
-	delete ee_4;
+    delete epz_3;
+    delete ept_3;
+    delete etheta_3;
+    delete ee_3;
+    delete ee_4;
     delete nuepz_3;
-	delete nuetheta_3;
+    delete nuept_3;
+    delete nuetheta_3;
     delete nuee_3;
     delete nuee_4;
     delete nuee_5;
-	delete output;
-	delete array;
-}
-
-void DetectorAnalysis::UnInit()
-{
-
+    delete canvas;
+    delete output;
 }
