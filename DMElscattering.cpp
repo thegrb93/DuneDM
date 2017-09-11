@@ -137,15 +137,17 @@ bool DMscattering::probscatter (double &pMax, double MDP, double MDM, double kap
     LXdet = LXdet*convmcm;
     XS = sigma(DM.E,MDM,MDP,kap,alD);
     XS = XS*convGeV2cm2;
-    //std::cout<<DM.E<<"\t"<<(XS*pow(10,39))<<std::endl;
+    std::cout<<DM.E<<"\t"<<XS<<std::endl;
 
     prob = XS*ne*LXdet;
-
-    if (prob > pMax)
+   
+    std::cout<<"XS is =" <<prob<<std::endl;
+    
+    if (prob > pMax0)
     {
-        pMax = prob;
+        pMax0 = prob;
     }
-    Rscat = prob/pMax;
+    Rscat = prob/pMax0;
 
     return Rscat > pscat;
 }
