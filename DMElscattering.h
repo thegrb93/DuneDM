@@ -13,9 +13,9 @@ public:
 	double dsigmadEe (double,double,double,double,double,double);
 	double F2 (double,double,double,double);
 	double sigma (double,double,double,double,double);
-	bool probscatter(double &,double,double,double,double,Particle&,double LXdet);
+	bool probscatter(double,double,double,double,Particle&,double LXdet);
 	void scatterevent(double,double,double,double,Particle&,Particle &);
-	bool probscatterNeutrino(double &pMax, Particle &DM, double LXdet);
+	bool probscatterNeutrino(Particle &DM, double LXdet);
 	void scattereventNeutrino(Particle &DM, Particle &electron);
 
     double nudSigmadEe(double nE, double theta);

@@ -122,7 +122,7 @@ double DMscattering::sigma (double EDM, double MDM, double MDP, double kappa, do
 	return(rsig);
 }
 //
-bool DMscattering::probscatter (double &pMax, double MDP, double MDM, double kap, double alD, Particle& DM, double LXdet) {
+bool DMscattering::probscatter (double MDP, double MDM, double kap, double alD, Particle& DM, double LXdet) {
 	double pscat, Rscat;
 	double XS;
 	double prob;
@@ -137,11 +137,7 @@ bool DMscattering::probscatter (double &pMax, double MDP, double MDM, double kap
     LXdet = LXdet*convmcm;
     XS = sigma(DM.E,MDM,MDP,kap,alD);
     XS = XS*convGeV2cm2;
-    std::cout<<DM.E<<"\t"<<XS<<std::endl;
-
     prob = XS*ne*LXdet;
-   
-    std::cout<<"XS is =" <<prob<<std::endl;
     
     if (prob > pMax0)
     {
@@ -152,7 +148,7 @@ bool DMscattering::probscatter (double &pMax, double MDP, double MDM, double kap
     return Rscat > pscat;
 }
 
-bool DMscattering::probscatterNeutrino (double &pMax, Particle& DM, double LXdet) {
+bool DMscattering::probscatterNeutrino (Particle& DM, double LXdet) {
 	double pscat, Rscat;
 	double XS;
 	double prob;
@@ -168,14 +164,10 @@ bool DMscattering::probscatterNeutrino (double &pMax, Particle& DM, double LXdet
     XS = nuSigma(DM.E);
     if(XS < 0) return false;
     XS = XS*convGeV2cm2;
-    //std::cout<<DM.E<<"\t"<<(XS*pow(10,39))<<std::endl;
-             //std::cout<<"XS is"<<XS<<std::endl;
     prob = XS*ne*LXdet;
-
-            //std::cout<<"Prob is"<<prob<<std::endl;
     if (prob > pMax0)
     {
-        pMax = prob;
+        pMax0 = prob;
 
     }
     Rscat = prob/pMax0;

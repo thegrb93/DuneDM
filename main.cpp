@@ -15,7 +15,7 @@ int main (int argc, char** argv) {
             ("particle", "Particle pdgcode to analyze", cxxopts::value<int>(), "")
             ("attribute", "The particle attribute to analyze", cxxopts::value<std::string>(), "")
             ("detector", "Which detector type to use. Can be 'DUNE'.", cxxopts::value<std::string>(), "")
-            ("files","The root files to analyze", cxxopts::value<std::vector<std::string>>(), "");
+            ("files","The folder containing root files to analyze", cxxopts::value<std::vector<std::string>>(), "");
     options.parse_positional("files");
 	options.parse(argc, argv);
 
@@ -37,10 +37,14 @@ int main (int argc, char** argv) {
 
 		auto constructor = modes.find(mode);
 		if(constructor != modes.end()) {
-			DMAnalysis* analysis = (constructor->second)();
-            analysis->files.assign(files.begin(), files.end());
-			analysis->Process();
-			delete analysis;
+            if(files.size()>0) {
+                DMAnalysis *analysis = (constructor->second)();
+                analysis->folder = files[0];
+                analysis->Process();
+                delete analysis;
+            }
+            else
+                std::cout << "Expected a folder containing darkmatter ntuples.\n";
 		}
 		else
 			std::cout << "Invalid mode: " << mode << std::endl;
