@@ -341,8 +341,148 @@ DetectorAnalysis::~DetectorAnalysis()
 {
 }
 
-void DetectorAnalysis::Init()
-{
+inline void calculateNeutrinoNearDetector(int ptype, double Necm, double pdPx, double pdPy, double pdPz, double Vx, double Vy, double Vz, double Nimpwt, double& energy, double& weight) {
+    const double detx = 0.0;
+    const double dety = 0.0;
+    const double detz = 57400.0;
+    const double rdet = 100.0;
+
+    double parent_mass;
+    switch(ptype)
+    {
+        case 5:
+        case 6:
+            parent_mass = 0.105658389; //Muon mass (GeV)
+        case 8:
+        case 9:
+            parent_mass = 0.13957; //Pi mass (GeV)
+            break;
+        case 10:
+            parent_mass = 0.49767; //Keon0 mass (GeV)
+        case 11:
+        case 12:
+            parent_mass = 0.49368; //Keon mass (GeV)
+        default:
+            return;
+    }
+    double parent_energy = sqrt(pdPx*pdPx +
+                                pdPy*pdPy +
+                                pdPz*pdPz +
+                                parent_mass*parent_mass);
+    double gamma = parent_energy / parent_mass;
+    double gamma_sqr = gamma*gamma;
+    double beta_mag = sqrt((gamma_sqr-1.)/gamma_sqr);
+
+    double rad = sqrt((detx-Vx)*(detx-Vx) +
+                      (dety-Vy)*(dety-Vy) +
+                      (detz-Vz)*(detz-Vz));
+
+    double parentp = sqrt((pdPx*pdPx)+
+                          (pdPy*pdPy)+
+                          (pdPz*pdPz));
+    double costh_pardet = (pdPx*(detx-Vx) +
+                           pdPy*(dety-Vy) +
+                           pdPz*(detz-Vz))/(parentp*rad);
+
+    if (costh_pardet>1.) costh_pardet = 1.;
+    else if (costh_pardet<-1.) costh_pardet = -1.;
+    double theta_pardet = acos(costh_pardet);
+
+    double emrat = 1./(gamma*(1. - beta_mag * cos(theta_pardet)));
+    double sangdet = (rdet*rdet /(rad*rad)/ 4.);
+
+    energy = emrat*Necm;
+    weight = sangdet * emrat * emrat * Nimpwt / M_PI;
+}
+
+void getNeutrinoDistribution(DMHistograms* hists, double normalize){
+    DUNEDetector det;
+    DMscattering scatter;
+
+    int neutrino_intersectcount = 0;
+    int neutrino_scattercount = 0;
+    double total_weight = 0;
+
+    Particle neutrino(0);
+    Particle electron(emass);
+
+    std::vector<std::string> neutrino_files;
+    getFolderFiles("data/neutrinos", neutrino_files);
+    for (std::vector<std::string>::iterator filen = neutrino_files.begin();
+         filen != neutrino_files.end(); ++filen) {
+        std::cout << *filen << std::endl;
+        TFile *neutrinos = new TFile(filen->c_str());
+        TTree *neutrino_tree = (TTree *) neutrinos->Get("nudata");
+        neutrino_tree->SetMakeClass(1);
+        int ptype, Ntype;
+        float Necm, pdPx, pdPy, pdPz, Vx, Vy, Vz;
+        double Nimpwt;
+        neutrino_tree->SetBranchAddress("ptype", &ptype);
+        neutrino_tree->SetBranchAddress("Ntype", &Ntype);
+        neutrino_tree->SetBranchAddress("Necm", &Necm);
+        neutrino_tree->SetBranchAddress("pdPx", &pdPx);
+        neutrino_tree->SetBranchAddress("pdPy", &pdPy);
+        neutrino_tree->SetBranchAddress("pdPz", &pdPz);
+        neutrino_tree->SetBranchAddress("Vx", &Vx);
+        neutrino_tree->SetBranchAddress("Vy", &Vy);
+        neutrino_tree->SetBranchAddress("Vz", &Vz);
+        neutrino_tree->SetBranchAddress("Nimpwt", &Nimpwt);
+
+        long long neutrino_entries = neutrino_tree->GetEntries();
+
+        for (long long i = 0, j = 0; j < 1e5; i = (i + 1) % neutrino_entries, ++j) {
+            //for (long long i = 0; i < neutrino_entries; ++i) {
+            neutrino_tree->GetEvent(i);
+            double energy, weight;//Nimpwt * NWtNear[0];
+            calculateNeutrinoNearDetector(ptype, Necm, pdPx, pdPy, pdPz, Vx, Vy, Vz, Nimpwt, energy, weight);
+
+            //total_weight += weight;
+            //neutrino.FourMomentum(ndxdz * ndz, ndydz * ndz, ndz, ne);
+            //double pLen, dx, dy, dz;
+            //neutrino.getNorm(pLen, dx, dy, dz);
+            //double pt = sqrt(neutrino.px * neutrino.px + neutrino.py * neutrino.py);
+            //double theta = acos(std::min<double>(std::max<double>(dz, -1), 1));
+
+            //hists->AddProductionNu(neutrino.E, neutrino.pz, pt, theta, ntype, weight);
+            hists->AddProductionNu(energy, 0, 0, 0, Ntype, weight);
+
+            /*double tmin = 0, tmax = 0;
+            if (det.intersect(dx, dy, dz, tmin, tmax)) {
+                hists->AddDetectorNu(neutrino.E, neutrino.pz, pt, theta, weight);
+
+                if (scatter.probscatterNeutrino(neutrino, tmax - tmin)) {
+                    scatter.scattereventNeutrino(neutrino, electron);
+
+                    /*hists->AddScatterNu(
+                        darkmatter.E,
+                        darkmatter.pz,
+                        sqrt(darkmatter.px*darkmatter.px+darkmatter.py*darkmatter.py),
+                        acos(std::min<double>(std::max<double>(electron.pz / sqrt(darkmatter.px * darkmatter.px + darkmatter.py * darkmatter.py + darkmatter.pz * darkmatter.pz), -1), 1)),
+                        weight
+                    );
+
+                    hists->AddScatterBgElectron(
+                            electron.E,
+                            electron.pz,
+                            sqrt(electron.px * electron.px + electron.py * electron.py),
+                            acos(std::min<double>(std::max<double>(electron.pz / sqrt(electron.px * electron.px +
+                                                                                      electron.py * electron.py +
+                                                                                      electron.pz * electron.pz),
+                                                                   -1), 1)),
+                            weight
+                    );
+                }
+            }*/
+        }
+        delete neutrino_tree;
+        delete neutrinos;
+    }
+    if (!normalize) {
+        //hists->ScaleNeutrinos(3e16 / total_weight);
+    }
+}
+
+void DetectorAnalysis::Init() {
 	//if(gOptions[OPT_DETECTOR])
 	//	detectorType = gOptions[OPT_DETECTOR].last()->arg;
 	//else
@@ -367,93 +507,11 @@ void DetectorAnalysis::Init()
 	
 	smear_sigma = 0.06;
 
-    DUNEDetector det;
-    DMscattering scatter;
-
-    double probMax = 1e-15;
-
-    if(true) {
-        std::vector<std::string> neutrino_files;
-        getFolderFiles("data/neutrinos", neutrino_files);
-        double total_weight = 0;
-        for (std::vector<std::string>::iterator filen = neutrino_files.begin();
-             filen != neutrino_files.end(); ++filen) {
-            std::cout << *filen << std::endl;
-            TFile *neutrinos = new TFile(filen->c_str());
-            TTree *neutrino_tree = (TTree *) neutrinos->Get("nudata");
-            neutrino_tree->SetMakeClass(1);
-            float ndxdz, ndydz, ndz, ne;
-            double Nimpwt;
-            double NWtNear[5];
-            int ntype;
-            neutrino_tree->SetBranchAddress("Ndxdz", &ndxdz);
-            neutrino_tree->SetBranchAddress("Ndydz", &ndydz);
-            neutrino_tree->SetBranchAddress("Npz", &ndz);
-            neutrino_tree->SetBranchAddress("Nenergy", &ne);
-            neutrino_tree->SetBranchAddress("Nimpwt", &Nimpwt);
-            neutrino_tree->SetBranchAddress("NWtNear[5]", &NWtNear);
-            neutrino_tree->SetBranchAddress("Ntype", &ntype);
-
-            long long neutrino_entries = neutrino_tree->GetEntries();
-            int neutrino_intersectcount = 0;
-            int neutrino_scattercount = 0;
-
-            Particle neutrino(0);
-            Particle electron(emass);
-
-            for (long long i = 0, j = 0; j < 1e4; i = (i + 1) % neutrino_entries, ++j) {
-                //for (long long i = 0; i < neutrino_entries; ++i) {
-                neutrino_tree->GetEvent(i);
-                double weight = Nimpwt * NWtNear[0];
-                total_weight += weight;
-
-                neutrino.FourMomentum(ndxdz * ndz, ndydz * ndz, ndz, ne);
-                double pLen, dx, dy, dz;
-                neutrino.getNorm(pLen, dx, dy, dz);
-                double pt = sqrt(neutrino.px * neutrino.px + neutrino.py * neutrino.py);
-                double theta = acos(std::min<double>(std::max<double>(dz, -1), 1));
-
-                hists->AddProductionNu(neutrino.E, neutrino.pz, pt, theta, ntype, weight);
-
-                double tmin = 0, tmax = 0;
-                if (det.intersect(dx, dy, dz, tmin, tmax)) {
-                    hists->AddDetectorNu(neutrino.E, neutrino.pz, pt, theta, weight);
-
-                    if (scatter.probscatterNeutrino(neutrino, tmax - tmin)) {
-                        scatter.scattereventNeutrino(neutrino, electron);
-
-                        /*hists->AddScatterNu(
-                            darkmatter.E,
-                            darkmatter.pz,
-                            sqrt(darkmatter.px*darkmatter.px+darkmatter.py*darkmatter.py),
-                            acos(std::min<double>(std::max<double>(electron.pz / sqrt(darkmatter.px * darkmatter.px + darkmatter.py * darkmatter.py + darkmatter.pz * darkmatter.pz), -1), 1)),
-                            weight
-                        );*/
-
-                        hists->AddScatterBgElectron(
-                                electron.E,
-                                electron.pz,
-                                sqrt(electron.px * electron.px + electron.py * electron.py),
-                                acos(std::min<double>(std::max<double>(electron.pz / sqrt(electron.px * electron.px +
-                                                                                          electron.py * electron.py +
-                                                                                          electron.pz * electron.pz),
-                                                                       -1), 1)),
-                                weight
-                        );
-                    }
-                }
-            }
-            delete neutrino_tree;
-            delete neutrinos;
-        }
-        if (!normalize_histos) {
-            hists->ScaleNeutrinos(3e16 / total_weight);
-        }
-    }
+    getNeutrinoDistribution(hists, normalize_histos);
 }
 
-void DetectorAnalysis::Analyze(const std::string& filen)
-{
+void DetectorAnalysis::Analyze(const std::string& filen) {
+    return;
 	double vpmass, chimass, kappa, alpha;
 	if(DMParameters(filen, vpmass, chimass, kappa, alpha)) return;
 
@@ -509,8 +567,7 @@ void DetectorAnalysis::Analyze(const std::string& filen)
 	delete array;
 }
 
-void DetectorAnalysis::UnInit()
-{
+void DetectorAnalysis::UnInit() {
     if(normalize_histos)
         hists->NormalizeHistograms();
     hists->SaveHistograms();
