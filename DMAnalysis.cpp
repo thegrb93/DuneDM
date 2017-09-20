@@ -341,28 +341,36 @@ DetectorAnalysis::~DetectorAnalysis()
 {
 }
 
-inline void calculateNeutrinoNearDetector(int ptype, double Necm, double pdPx, double pdPy, double pdPz, double Vx, double Vy, double Vz, double Nimpwt, double& energy, double& weight) {
+inline void calculateNeutrinoNearDetector(int ptype, int Ntype, double ppenergy, double ppdxdz, double ppdydz, double pppz, double Necm, double pdPx, double pdPy, double pdPz, double Vx, double Vy, double Vz, double mupare, double muparpx, double muparpy, double muparpz, double Nimpwt, double& nu_energy, double& weight) {
     const double detx = 0.0;
     const double dety = 0.0;
     const double detz = 57400.0;
     const double rdet = 100.0;
+
+    const double mumass  =    0.105658389;
+    const double taumass =    1.77682;
 
     double parent_mass;
     switch(ptype)
     {
         case 5:
         case 6:
-            parent_mass = 0.105658389; //Muon mass (GeV)
+            parent_mass = mumass; //Muon mass (GeV)
+            break;
         case 8:
         case 9:
             parent_mass = 0.13957; //Pi mass (GeV)
             break;
         case 10:
             parent_mass = 0.49767; //Keon0 mass (GeV)
+            break;
         case 11:
         case 12:
             parent_mass = 0.49368; //Keon mass (GeV)
+            break;
         default:
+            std::cout << "INVALID NEUTRINO PARENT! " << ptype << std::endl;
+            weight = 0;
             return;
     }
     double parent_energy = sqrt(pdPx*pdPx +
@@ -391,8 +399,86 @@ inline void calculateNeutrinoNearDetector(int ptype, double Necm, double pdPx, d
     double emrat = 1./(gamma*(1. - beta_mag * cos(theta_pardet)));
     double sangdet = (rdet*rdet /(rad*rad)/ 4.);
 
-    energy = emrat*Necm;
+    nu_energy = emrat*Necm;
     weight = sangdet * emrat * emrat * Nimpwt / M_PI;
+
+    //done for all except polarized muon
+    // in which case need to modify weight
+    if (ptype==5 || ptype==6)
+    {
+        //boost new neutrino to mu decay cm
+        double beta[3];
+        double p_nu[3]; //nu momentum
+        beta[0]=pdPx / parent_energy;
+        beta[1]=pdPy / parent_energy;
+        beta[2]=pdPz / parent_energy;
+
+        p_nu[0] = (detx - Vx) * nu_energy / rad;
+        p_nu[1] = (dety - Vy) * nu_energy / rad;
+        p_nu[2] = (detz - Vz) * nu_energy / rad;
+
+        double partial = gamma*(beta[0]*p_nu[0]+
+                                beta[1]*p_nu[1]+
+                                beta[2]*p_nu[2]);
+        partial = nu_energy-partial / (gamma+1.);
+        double p_dcm_nu[4];
+        for (int i=0;i<3;i++) p_dcm_nu[i]=p_nu[i]-beta[i]*gamma*partial;
+        p_dcm_nu[3]=0.;
+        for (int i=0;i<3;i++) p_dcm_nu[3]+=p_dcm_nu[i]*p_dcm_nu[i];
+        p_dcm_nu[3]=sqrt(p_dcm_nu[3]);
+
+        //boost parent of mu to mu production cm
+        gamma= ppenergy / parent_mass;
+        beta[0] = ppdxdz * pppz / ppenergy;
+        beta[1] = ppdydz * pppz / ppenergy;
+        beta[2] =                  pppz / ppenergy;
+        partial = gamma*(beta[0]*muparpx+
+                         beta[1]*muparpy+
+                         beta[2]*muparpz);
+        partial = mupare - partial / (gamma+1.);
+        double p_pcm_mp[4];
+        p_pcm_mp[0]=muparpx-beta[0]*gamma*partial;
+        p_pcm_mp[1]=muparpy-beta[1]*gamma*partial;
+        p_pcm_mp[2]=muparpz-beta[2]*gamma*partial;
+        p_pcm_mp[3]=0.;
+        for (int i=0;i<3;i++) p_pcm_mp[3]+=p_pcm_mp[i]*p_pcm_mp[i];
+        p_pcm_mp[3]=sqrt(p_pcm_mp[3]);
+
+        double wt_ratio = 1.;
+        //have to check p_pcm_mp
+        //it can be 0 if mupar..=0. (I guess muons created in target??)
+        if (p_pcm_mp[3] != 0. ) {
+            //calc new decay angle w.r.t. (anti)spin direction
+            double costh = (p_dcm_nu[0]*p_pcm_mp[0]+
+                            p_dcm_nu[1]*p_pcm_mp[1]+
+                            p_dcm_nu[2]*p_pcm_mp[2])/(p_dcm_nu[3]*p_pcm_mp[3]);
+
+            if (costh>1.) costh = 1.;
+            else if (costh<-1.) costh = -1.;
+
+            //calc relative weight due to angle difference
+            if (Ntype == 53 || Ntype == 52)
+            {
+                wt_ratio = 1.-costh;
+            }
+            else if (Ntype == 56 || Ntype == 55)
+            {
+                double xnu = 2.* Necm / mumass;
+                wt_ratio = ( (3.-2.*xnu) - (1.-2.*xnu)*costh ) / (3.-2.*xnu);
+            }
+            else if (Ntype == 58 || Ntype == 59)
+            {
+                double xnu = 2.* Necm / taumass;
+                wt_ratio = ( (3.-2.*xnu) - (1.-2.*xnu)*costh ) / (3.-2.*xnu);
+                std::cout << "calculating weight for tau neutrino; this may not be correct" << std::endl;
+            }
+            else
+            {
+                std::cout << "eventRates:: Bad neutrino type = " << Ntype << std::endl;
+            }
+        }
+        weight *= wt_ratio;
+    }
 }
 
 void getNeutrinoDistribution(DMHistograms* hists, double normalize){
@@ -415,7 +501,7 @@ void getNeutrinoDistribution(DMHistograms* hists, double normalize){
         TTree *neutrino_tree = (TTree *) neutrinos->Get("nudata");
         neutrino_tree->SetMakeClass(1);
         int ptype, Ntype;
-        float Necm, pdPx, pdPy, pdPz, Vx, Vy, Vz;
+        float Necm, pdPx, pdPy, pdPz, Vx, Vy, Vz, ppenergy, ppdxdz, ppdydz, pppz, mupare, muparpx, muparpy, muparpz;
         double Nimpwt;
         neutrino_tree->SetBranchAddress("ptype", &ptype);
         neutrino_tree->SetBranchAddress("Ntype", &Ntype);
@@ -426,6 +512,14 @@ void getNeutrinoDistribution(DMHistograms* hists, double normalize){
         neutrino_tree->SetBranchAddress("Vx", &Vx);
         neutrino_tree->SetBranchAddress("Vy", &Vy);
         neutrino_tree->SetBranchAddress("Vz", &Vz);
+        neutrino_tree->SetBranchAddress("ppenergy", &ppenergy);
+        neutrino_tree->SetBranchAddress("ppdxdz", &ppdxdz);
+        neutrino_tree->SetBranchAddress("ppdydz", &ppdydz);
+        neutrino_tree->SetBranchAddress("pppz", &pppz);
+        neutrino_tree->SetBranchAddress("mupare", &mupare);
+        neutrino_tree->SetBranchAddress("muparpx", &muparpx);
+        neutrino_tree->SetBranchAddress("muparpy", &muparpy);
+        neutrino_tree->SetBranchAddress("muparpz", &muparpz);
         neutrino_tree->SetBranchAddress("Nimpwt", &Nimpwt);
 
         long long neutrino_entries = neutrino_tree->GetEntries();
@@ -434,7 +528,7 @@ void getNeutrinoDistribution(DMHistograms* hists, double normalize){
             //for (long long i = 0; i < neutrino_entries; ++i) {
             neutrino_tree->GetEvent(i);
             double energy, weight;//Nimpwt * NWtNear[0];
-            calculateNeutrinoNearDetector(ptype, Necm, pdPx, pdPy, pdPz, Vx, Vy, Vz, Nimpwt, energy, weight);
+            calculateNeutrinoNearDetector(ptype, Ntype, ppenergy, ppdxdz, ppdydz, pppz, Necm, pdPx, pdPy, pdPz, Vx, Vy, Vz, mupare, muparpx, muparpy, muparpz, Nimpwt, energy, weight);
 
             //total_weight += weight;
             //neutrino.FourMomentum(ndxdz * ndz, ndydz * ndz, ndz, ne);
