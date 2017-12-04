@@ -1,5 +1,6 @@
 #include <cmath>
 #include <algorithm>
+#include <iostream>
 
 #include "DUNEdet.h"
 #include "Particle.h"
@@ -128,6 +129,7 @@ double DUNEDetector::Ldet (Particle &DM) {
     double tmin = 0, tmax = 0;
     if(intersectAABB(0, 0, 0, DM.px/pLen, DM.py/pLen, DM.pz/pLen, minsx, minsy, minsz, maxsx, maxsy, maxsz, tmin, tmax))
     {
+        std::cout << tmax - tmin << std::endl;
         return tmax - tmin;
     }
 }
@@ -137,13 +139,13 @@ bool DUNEDetector::intersect(double dx, double dy, double dz, double& tmin, doub
 }
 
 DUNEDetector::DUNEDetector():
-posx(0), posy(0), posz(570)
+posx(0), posy(0), posz(575)
 {
-    double width = 3.5, height = 3.5, depth = 6.4;
-    minsx = posx - width/2;
-    maxsx = posx + width/2;
-    minsy = posy - height/2;
-    maxsy = posy + height/2;
-    minsz = posz - depth/2;
-    maxsz = posz + depth/2;
+    double width = 4, height = 3, depth = 5;
+    minsx = posx - width/2.0;
+    maxsx = posx + width/2.0;
+    minsy = posy - height/2.0;
+    maxsy = posy + height/2.0;
+    minsz = posz - depth/2.0;
+    maxsz = posz + depth/2.0;
 }

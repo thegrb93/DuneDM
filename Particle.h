@@ -6,9 +6,10 @@ class Particle{
 public:
     Particle();
     Particle(double);
-    double   m, px, py, pz, E; 
+    double   m, px, py, pz, E;
     void     FourMomentum(double, double, double, double);
     void     Lorentz(Particle);
-    void getNorm(double& len, double& x, double& y, double& z);
+    double   norm, normpx, normpy, normpz, pt, theta, phi;
+    void calcOptionalKinematics();
 };
 

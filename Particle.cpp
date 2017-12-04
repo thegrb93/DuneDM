@@ -69,7 +69,11 @@ void Particle::Lorentz(Particle parent){
 	FourMomentum(p3x, p3y, p3z, E3);
 }
 
-void Particle::getNorm(double &len, double &x, double &y, double &z) {
-    len = sqrt(px*px+py*py+pz*pz);
-    x = px/len; y = py/len; z = pz/len;
+void Particle::calcOptionalKinematics() {
+    norm = sqrt(px*px+py*py+pz*pz);
+    normpx = px/norm; normpy = py/norm; normpz = pz/norm;
+    pt = sqrt(px*px+py*py);
+    theta = acos(normpz);
+    phi = atan2(py, px);
 }
+

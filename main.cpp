@@ -11,7 +11,7 @@ TApplication* gApp;
 int main (int argc, char** argv) {
 	cxxopts::Options options("DuneDM", "USAGE: DuneDM [options] files");
 	options.add_options()
-            ("mode", "Which analysis mode to use. Can be 'statistics', 'histograms', or 'detector'.", cxxopts::value<std::string>(), "")
+            ("mode", "Which analysis mode to use. Can be 'statistics', 'sensitivity', or 'detector'.", cxxopts::value<std::string>(), "")
             ("particle", "Particle pdgcode to analyze", cxxopts::value<int>(), "")
             ("attribute", "The particle attribute to analyze", cxxopts::value<std::string>(), "")
             ("detector", "Which detector type to use. Can be 'DUNE'.", cxxopts::value<std::string>(), "")
@@ -29,28 +29,34 @@ int main (int argc, char** argv) {
         catch(...){ mode = "detector"; }
         if(mode.empty())
             mode = "detector";
-			
-		std::map<std::string,DMAnalysis*(*)()> modes = {
-			{"statistics", &StatisticsAnalysis::create},
-			{"detector", &DetectorAnalysis::create}
+		
+		auto statistics = [](const std::vector<std::string>& folders){
+            StatisticsAnalysis analysis;
+            return analysis.Process(folders[0]);
+		};
+		auto detector = [](const std::vector<std::string>& folders){
+            DetectorAnalysis analysis;
+            return analysis.Process(folders[0]);
+		};
+		auto sensitivity = [](const std::vector<std::string>& folders){
+            SensitivityScan analysis;
+            return analysis.Process(folders);
+		};
+		
+		std::map<std::string,int(*)(const std::vector<std::string>&)> modes = {
+			{"statistics", statistics},
+			{"detector", detector},
+			{"sensitivity", sensitivity}
 		};
 
-		auto constructor = modes.find(mode);
-		if(constructor != modes.end()) {
-            if(files.size()>0) {
-                DMAnalysis *analysis = (constructor->second)();
-                analysis->folder = files[0];
-                analysis->Process();
-                delete analysis;
-            }
-            else
-                std::cout << "Expected a folder containing darkmatter ntuples.\n";
-		}
+		auto func = modes.find(mode);
+		if(func != modes.end())
+		    func->second(files);
 		else
 			std::cout << "Invalid mode: " << mode << std::endl;
 	}
 	else
-		std::cout << "Expected input root files. Got none.\n";
+		std::cout << "Missing input directory.\n";
 
 	return 0;
 }

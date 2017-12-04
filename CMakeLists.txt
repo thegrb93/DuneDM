@@ -18,6 +18,6 @@ file(GLOB DuneDM_SRCS ${PROJECT_SOURCE_DIR}/*.cpp)
 
 #add_definitions(${ROOT_DEFINITIONS})
 add_executable(DuneDM ${DuneDM_SRCS} "${CMAKE_CURRENT_BINARY_DIR}/DuneDMDict.pcm")
-target_link_libraries(DuneDM ${ROOT_LIBRARIES} libExRootAnalysis.so)
+target_link_libraries(DuneDM ${ROOT_LIBRARIES} libExRootAnalysis.so libarmadillo.so)
 
 

@@ -10,23 +10,22 @@ class TFile;
 class TBranch;
 class TGraph2D;
 class TH1D;
+class TProfile;
 class TRootLHEFParticle;
 class DMHistograms;
 
 class DMAnalysis
 {
 public:
-    std::string folder;
 	std::vector<std::string> files;
 	DMAnalysis();
 	virtual ~DMAnalysis();
-	int Process();
+	int Process(std::string folder);
 
 protected:
-	TBranch* branch;
-	Long64_t nentries;
-	virtual void Analyze(const std::string& file) = 0;
-	virtual void Init() = 0;
+	double vpmass, chimass, kappa, alpha;
+	virtual int Analyze(TFile*, TBranch*) = 0;
+	virtual void Init(TFile*) = 0;
 	virtual void UnInit() = 0;
 };
 
@@ -39,11 +38,10 @@ class StatisticsAnalysis : public DMAnalysis
 public:
 	StatisticsAnalysis();
 	~StatisticsAnalysis();
-	static DMAnalysis* create();
 
 protected:
-	void Analyze(const std::string& file);
-	void Init();
+	int Analyze(TFile*, TBranch*);
+	void Init(TFile*);
 	void UnInit();
 };
 
@@ -57,10 +55,34 @@ class DetectorAnalysis : public DMAnalysis
 public:
 	DetectorAnalysis();
 	~DetectorAnalysis();
-	static DMAnalysis* create();
 protected:
-	void Analyze(const std::string& file);
-	void Init();
+	int Analyze(TFile*, TBranch*);
+	void Init(TFile*);
 	void UnInit();
+};
+
+class SensitivityAnalysis : public DMAnalysis
+{
+	double smear_sigma;
+	double smear_mean;
+	double dm_crosssection;
+	TH1D *dm_energy, *nu_energy;
+	TProfile *theta_avg;
+	TFile* nu_cache;
+public:
+    double xsection;
+	SensitivityAnalysis();
+	~SensitivityAnalysis();
+protected:
+	int Analyze(TFile*, TBranch*);
+	void Init(TFile*);
+	void UnInit();
+};
+
+class SensitivityScan
+{
+public:
+    SensitivityScan();
+	int Process(const std::vector<std::string>& folders);
 };
 
