@@ -43,7 +43,7 @@ DMHistograms::DMHistograms(std::string rname) {
     dmthe3 = new TH1D("dmthe3","#chi Scatter #theta;#theta", 100, 0, 0.006);
     dm_epz1 = new TH1D("dm_epz1","#chi + e^{-} Scatter P_{z};P_{z} (GeV/c)", 100, 0, 6);
     dm_ept1 = new TH1D("dm_ept1","#chi + e^{-} Scatter P_{t};P_{t} (GeV/c)", 100, 0, 6);
-    dm_ethe1 = new TH1D("dm_ethe1","#chi + e^{-} Scatter #theta;#theta)", 100, 0, 3.2);
+    dm_ethe1 = new TH1D("dm_ethe1","#chi + e^{-} Scatter #theta;#theta", 100, 0, 3.2);
     dm_ee1 = new TH1D("dm_ee1","#chi + e^{-} Scatter E;E (GeV)", 100, 0, 6);
     dm_ee1smear = new TH1D("dm_ee1smear","#chi + e^{-} Smeared Scatter E;E (GeV)", 100, 0, 6);
     dm_ee1smearr = new TH1D("dm_ee1smearr","#chi + e^{-} Scatter Energy Smearing Ratio;E (GeV)", 40, 0, 6);
@@ -62,6 +62,10 @@ DMHistograms::DMHistograms(std::string rname) {
         nu_output->GetObject("nupt2", nupt2);
         nu_output->GetObject("nue2", nue2);
         nu_output->GetObject("nuthe2", nuthe2);
+        nu_output->GetObject("nupz3", nupz3);
+        nu_output->GetObject("nupt3", nupt3);
+        nu_output->GetObject("nue3", nue3);
+        nu_output->GetObject("nuthe3", nuthe3);
         nu_output->GetObject("nu_epz1", nu_epz1);
         nu_output->GetObject("nu_ept1", nu_ept1);
         nu_output->GetObject("nu_ethe1", nu_ethe1);
@@ -89,7 +93,7 @@ DMHistograms::DMHistograms(std::string rname) {
         nuthe3 = new TH1D("nuthe3","#nu in Detector #theta;#theta", 100, 0, 0);
         nu_epz1 = new TH1D("nu_epz1","#nu + e^{-} Scatter P_{z};P_{z} (GeV/c)", 100, 0, 6);
         nu_ept1 = new TH1D("nu_ept1","#nu + e^{-} Scatter P_{z};P_{z} (GeV/c)", 100, 0, 6);
-        nu_ethe1 = new TH1D("nu_ethe1","#nu + e^{-} Scatter #theta;#theta)", 100, 0, 3.2);
+        nu_ethe1 = new TH1D("nu_ethe1","#nu + e^{-} Scatter #theta;#theta", 100, 0, 3.2);
         nu_ee1 = new TH1D("nu_ee1","#nu + e^{-} Scatter E;E (GeV)", 100, 0, 6);
         nu_ee1smear = new TH1D("nu_ee1smear","#nu + e^{-} Smeared Scatter E;E (GeV)", 100, 0, 6);
         nu_ee1smearr = new TH1D("nu_ee1smearr","#nu + e^{-} Scatter Energy Smearing Ratio;E (GeV)", 40, 0, 6);
@@ -444,19 +448,52 @@ void DMHistograms::SaveHistograms() {
     delete canvas;
 }
 
-void DMHistograms::ScaleNeutrinos(double scale) {
+void DMHistograms::ScaleDarkmatter(double scale, double detscale) {
+    dmpx1->Scale(scale);
+    dmpy1->Scale(scale);
+    dmpz1->Scale(scale);
+    //dmpt1->Scale(scale);
+    dme1->Scale(scale);
+    dmthe1->Scale(scale);
+    dmphi1->Scale(scale);
+    //dmtime->Scale(scale);
+    dmx2->Scale(scale);
+    dmy2->Scale(scale);
+    dmxy2->Scale(scale);
+    dmpx2->Scale(scale);
+    dmpy2->Scale(scale);
+    dmpz2->Scale(scale);
+    dmpt2->Scale(scale);
+    dme2->Scale(scale);
+    dmthe2->Scale(scale);
+    dmphi2->Scale(scale);
+    dme3->Scale(detscale);
+    dmpz3->Scale(detscale);
+    //dmpt3->Scale(detscale);
+    dmthe3->Scale(detscale);
+    dm_ee1->Scale(detscale);
+    dm_epz1->Scale(detscale);
+    dm_ept1->Scale(detscale);
+    dm_ethe1->Scale(detscale);
+}
+
+void DMHistograms::ScaleNeutrinos(double scale, double detscale) {
     nupz1->Scale(scale);
     nupt1->Scale(scale);
     nuthe1->Scale(scale);
     nue1->Scale(scale);
     nupz2->Scale(scale);
     nupt2->Scale(scale);
-    nue2->Scale(scale);
     nuthe2->Scale(scale);
-    nu_epz1->Scale(scale);
-    nu_ept1->Scale(scale);
-    nu_ee1->Scale(scale);
-    nu_ethe1->Scale(scale);
+    nue2->Scale(scale);
+    nupz3->Scale(detscale);
+    nupt3->Scale(detscale);
+    nuthe3->Scale(detscale);
+    nue3->Scale(detscale);
+    nu_epz1->Scale(detscale);
+    nu_ept1->Scale(detscale);
+    nu_ee1->Scale(detscale);
+    nu_ethe1->Scale(detscale);
 }
 
 void DMHistograms::AddProductionDM(TH1D* E, TH1D* Px, TH1D* Py, TH1D* Pz, TH1D* Th, TH1D* Phi) {

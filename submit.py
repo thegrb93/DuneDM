@@ -7,17 +7,18 @@ import subprocess
 import sys
 import time
 
-#param_ranges = [
-#[x * 1.5 + 3 for x in range(0, 4)], #vpmass
-#[x * 0.1 + 0.1 for x in range(0, 4)], #chimass
-#[x * 0.01 + 0.001 for x in range(0, 2)], #kappa
-#[x * 1 + 0.1 for x in range(0, 1)] #alpha
-#]
+def step_range(smin, smax, steps):
+    if steps==1:
+        return [smin]
+    else:
+        size = (smax-smin)/(steps-1)
+        return [x * size + smin for x in range(steps)]
+
 param_ranges = [
-[7.5], #vpmass
-[x * 0.2 + 1 for x in range(0, 21)], #chimass
-[0.01], #kappa
-[0.1] #alpha
+step_range(7.5,7.5,1), #vpmass
+step_range(1,5,21), #chimass
+step_range(0.01,0.01,1), #kappa
+step_range(0.1,0.1,1) #alpha
 ]
 
 jobcount = 700
@@ -106,7 +107,7 @@ while i<4:
     kappa = param_ranges[2][iteration_state[2]]
     alpha = param_ranges[3][iteration_state[3]]
 
-    if vpmass>chimass:
+    if vpmass>=chimass*2:
         submit_job(vpmass, chimass, kappa, alpha)
     
     index += 1

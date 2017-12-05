@@ -19,7 +19,8 @@ public:
     void AddScatterNu(double E, double Pz, double Pt, double Th, double W);
     void AddScatterSigElectron(double E, double Pz, double Pt, double Th);
     void AddScatterBgElectron(double E, double Pz, double Pt, double Th, double W);
-    void ScaleNeutrinos(double scale);
+    void ScaleDarkmatter(double scale, double detscale);
+    void ScaleNeutrinos(double scale, double detscale);
     void NormalizeHistograms();
     void SaveHistograms();
 

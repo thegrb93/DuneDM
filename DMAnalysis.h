@@ -25,7 +25,7 @@ public:
 protected:
 	double vpmass, chimass, kappa, alpha;
 	virtual int Analyze(TFile*, TBranch*) = 0;
-	virtual void Init(TFile*) = 0;
+	virtual void Init(TFile*, TBranch*) = 0;
 	virtual void UnInit() = 0;
 };
 
@@ -41,7 +41,7 @@ public:
 
 protected:
 	int Analyze(TFile*, TBranch*);
-	void Init(TFile*);
+	void Init(TFile*, TBranch*);
 	void UnInit();
 };
 
@@ -51,13 +51,15 @@ class DetectorAnalysis : public DMAnalysis
 	std::string detectorType;
 	double smear_sigma;
 	double smear_mean;
+	double dm_detector_scale;
+	double xsection;
     bool normalize_histos;
 public:
 	DetectorAnalysis();
 	~DetectorAnalysis();
 protected:
 	int Analyze(TFile*, TBranch*);
-	void Init(TFile*);
+	void Init(TFile*, TBranch*);
 	void UnInit();
 };
 
@@ -65,17 +67,17 @@ class SensitivityAnalysis : public DMAnalysis
 {
 	double smear_sigma;
 	double smear_mean;
-	double dm_crosssection;
 	TH1D *dm_energy, *nu_energy;
 	TProfile *theta_avg;
 	TFile* nu_cache;
 public:
-    double xsection;
+    double dm_detector_scale, nu_detector_scale;
+    double chisqr, xsection;
 	SensitivityAnalysis();
 	~SensitivityAnalysis();
 protected:
 	int Analyze(TFile*, TBranch*);
-	void Init(TFile*);
+	void Init(TFile*, TBranch*);
 	void UnInit();
 };
 
