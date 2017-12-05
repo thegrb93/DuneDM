@@ -33,6 +33,7 @@
 #include "Particle.h"
 #include "DUNEdet.h"
 #include "DMElscattering.h"
+#include "Random.h"
 
 const double emass = 0.000511;
 
@@ -549,7 +550,7 @@ void DetectorAnalysis::Init(TFile* file, TBranch* branch) {
 		smear_mean = toDouble(gOptions[OPT_DET_SMEAR_MEAN].last()->arg);
 	else
 		smear_mean = 0;*/
-	
+	smear_mean = 0;
 	smear_sigma = 0.06;
 	
 	std::stringstream runname;
@@ -570,7 +571,7 @@ void DetectorAnalysis::Init(TFile* file, TBranch* branch) {
             hists->AddScatterBgElectron(electron.E, electron.pz, electron.pt, electron.theta, weight);
 	    });
 	    
-        double desired_pot = 1e20;
+        double desired_pot = 6e20;
         double nu_pot = 250000000;
         double scale = desired_pot/nu_pot;
 	    hists->ScaleNeutrinos(scale, scale/detector_scale);
@@ -608,7 +609,7 @@ int DetectorAnalysis::Analyze(TFile* file, TBranch* branch) {
 }
 
 void DetectorAnalysis::UnInit() {
-    double desired_pot = 1e20;
+    double desired_pot = 6e20;
     double dm_pot = std::pow(files.size(),2)/(12*xsection*1e-40*100*6.022140857e23);
     double dm_scale = desired_pot/dm_pot;
     hists->ScaleDarkmatter(dm_scale, dm_scale/dm_detector_scale);
@@ -622,38 +623,38 @@ void DetectorAnalysis::UnInit() {
 ////////////////////////////////////////////////////////////////////
 
 SensitivityAnalysis::SensitivityAnalysis(){	
+	smear_mean = 0;
 	smear_sigma = 0.06;
 	chisqr = 0;
-	nu_cache = 0;
 	xsection = 0;
-	dm_detector_scale = 10;
+	dm_detector_scale = 100;
 	nu_detector_scale = 1000;
 	
-	const char* nufile = "nu_energies.root";
+	const char* nufile = "data/nu_energies.root";
 	struct stat buffer;
-    if(stat(nufile, &buffer) == 0)
-    {
-        nu_cache = new TFile(nufile);
-        nu_cache->GetObject("nuenergy", nu_energy);
-    }
-    else
+    if(stat(nufile, &buffer) != 0)
     {
         TFile file(nufile, "NEW");
-        nu_energy = new TH1D("nex","nex",100,0,10);
+        nu_energy = new TH1D("nuenergy","nuenergy",20,0.3,2);
         iterateNeutrino((int)nu_detector_scale,
         [=](Particle&, double){},
         [=](Particle&, double, double, double){},
         [=](Particle&, Particle& neutrino, Particle& electron, double weight){
-            nu_energy->Fill(electron.E, weight);
+            double E = electron.E;
+            E += Random::Gauss(smear_mean, smear_sigma / std::sqrt(E));
+            if(E>0){
+                nu_energy->Fill(E, weight);
+            }
         });
         file.cd();
         nu_energy->Scale(1/nu_detector_scale);
-        nu_energy->Write("nuenergy");
         file.Write();
     }
     
-    dm_energy = new TH1D("nth","nth",100,0,10);
-	theta_avg = new TProfile("theta","theta",100,0,M_PI/2);
+    nu_cache = new TFile(nufile);
+    nu_cache->GetObject("nuenergy", nu_energy);
+    dm_energy = new TH1D("nth","nth",20,0.3,2);
+	theta_avg = new TProfile("theta","theta",20,0.3,2);
 }
 
 SensitivityAnalysis::~SensitivityAnalysis(){
@@ -672,16 +673,20 @@ int SensitivityAnalysis::Analyze(TFile* file, TBranch* branch) {
 	
 	iterateDarkmatter((int)dm_detector_scale, branch, vpmass, chimass, kappa, alpha,
     [=](Particle&, double, double){},
-    [=](Particle&, Particle&, Particle& electron){
-        dm_energy->Fill(electron.E);
-        theta_avg->Fill(electron.E, electron.theta);
+    [=](Particle& darkmatter, Particle&, Particle& electron){
+        double E = electron.E;
+        E += Random::Gauss(smear_mean, smear_sigma / std::sqrt(E));
+        if(E>0){
+            dm_energy->Fill(E);
+            theta_avg->Fill(E, electron.theta);
+        }
     });
     
     return 0;
 }
 
 void SensitivityAnalysis::UnInit() {
-    double desired_pot = 1e20;
+    double desired_pot = 6e20;
     double dm_pot = std::pow(files.size(),2)/(12*xsection*1e-40*100*6.022140857e23);
     double nu_pot = 25000000;
     
@@ -691,24 +696,33 @@ void SensitivityAnalysis::UnInit() {
     std::vector<double> N_th, N_ex, cs_mean;
     int nbins = dm_energy->GetSize()-1;
     for(int i = 1; i<nbins; ++i){
-        N_th.push_back(dm_energy->operator[](i)+nu_energy->operator[](i));
-        N_ex.push_back(nu_energy->operator[](i));
-        cs_mean.push_back(theta_avg->operator[](i));
+        N_th.push_back(dm_energy->GetBinContent(i)+nu_energy->GetBinContent(i));
+        N_ex.push_back(nu_energy->GetBinContent(i));
+        cs_mean.push_back(theta_avg->GetBinContent(i));
     }
+    for(auto i = N_th.begin(); i!=N_th.end(); ++i)
+        std::cout << *i << " ";
+    std::cout << std::endl << std::endl;
+    for(auto i = N_ex.begin(); i!=N_ex.end(); ++i)
+        std::cout << *i << " ";
+    std::cout << std::endl << std::endl;
+    for(auto i = cs_mean.begin(); i!=cs_mean.end(); ++i)
+        std::cout << *i << " ";
+    std::cout << std::endl << std::endl;
     chisqr = chisq_pullfunc(N_th, N_ex, cs_mean);
+    std::cout << "Chisqr is " << chisqr << std::endl;
     
     delete dm_energy;
     delete nu_energy;
     delete theta_avg;
-    if(nu_cache)
-        delete nu_cache;
+    delete nu_cache;
 }
 
 SensitivityScan::SensitivityScan() {
 }
 
 int SensitivityScan::Process(const std::vector<std::string>& folders){
-    std::vector<double> xsections, chisqr, masses;
+    std::vector<double> xsections, chisqr, masses, chisqr1d, masses1d;
     double chiscan;
     double ivpmass, ichimass, ialpha, ikappa;
     double vpmass, chimass, alpha, kappa;
@@ -727,10 +741,6 @@ int SensitivityScan::Process(const std::vector<std::string>& folders){
                 std::cout << "Couldn't read DM parameters!\n";
                 return 1;
             }
-            if(ivpmass!=vpmass || ialpha!=alpha || ikappa!=kappa){
-                std::cout << "Found params that don't match the rest of the scan!\n";
-                return 1;
-            }
             SensitivityAnalysis analysis;
             if(analysis.Process(*i)){
                 std::cout << "Processing failed!\n";
@@ -744,6 +754,10 @@ int SensitivityScan::Process(const std::vector<std::string>& folders){
             xsections.push_back(std::pow(kappa,2)*alpha*std::pow(chimass/vpmass,4));
             chisqr.push_back(analysis.chisqr);
             masses.push_back(chimass);
+            if(ivpmass==vpmass && ialpha==alpha && ikappa==kappa){
+                chisqr1d.push_back(analysis.chisqr);
+                masses1d.push_back(chimass);
+            }
         }
     }
     
@@ -757,13 +771,13 @@ int SensitivityScan::Process(const std::vector<std::string>& folders){
     sstitle1 << "Sensitivity M_{vp}=" << ivpmass << " #kappa=" << ikappa << " #alpha=" << ialpha << ";M_{#chi} (GeV);#Chi^{2}";
     
     sstitle2 << std::fixed << std::setprecision(3);
-    sstitle2 << "90% Sensitivity M_{vp}=" << ivpmass << "(GeV) #kappa=" << ikappa << " #alpha=" << ialpha << ";M_{#chi} (GeV);#rho_{#chi}";
+    sstitle2 << "90% Sensitivity #alpha=" << ialpha << ";M_{#chi} (GeV);#rho_{#chi}";
     
     std::string title1 = sstitle1.str();
     std::string title2 = sstitle2.str();
     
     TCanvas* canvas = new TCanvas("c1","canvas",1024,576);
-    TGraph* graph = new TGraph(masses.size(),masses.data(),xsections.data());
+    TGraph* graph = new TGraph(masses1d.size(),masses1d.data(),chisqr1d.data());
     graph->SetTitle(title1.c_str());
     graph->Draw("");
     canvas->Update();
