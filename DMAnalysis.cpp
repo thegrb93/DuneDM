@@ -20,6 +20,7 @@
 #include <TChain.h>
 #include <TGraph2D.h>
 #include <TLegend.h>
+#include <TMarker.h>
 #include <fstream>
 #include <TApplication.h>
 #include <dirent.h>
@@ -355,44 +356,44 @@ DMAnalysis::~DMAnalysis() {
 int DMAnalysis::Process(std::string folder) {
     if(DMParameters(folder, vpmass, chimass, kappa, alpha)){
 		std::cout << "Couldn't parse DM parameters.\n";
+		UnInit();
 		return 1;
     }
     
     getFolderFiles(folder, files);
     if(files.size()==0) {
         std::cout << "Didn't find any root files.\n";
+        UnInit();
         return 1;
     }
     
     bool first = true;
 	for(auto fname = files.begin(); fname!=files.end(); ++fname) {
-		TFile* file = new TFile(fname->c_str());
+		TFile file(fname->c_str());
 		TTree* tree;
 		TBranch* branch;
 		
-		if(!file->IsOpen()) {
-			std::cout << "Failed to open file: " << file->GetName() << std::endl;
-			return 1;
+		if(!file.IsOpen()) {
+			std::cout << "Failed to open file: " << file.GetName() << std::endl;
+			continue;
 		}
 
-		file->GetObject("LHEF",tree);
+		file.GetObject("LHEF",tree);
 		if(!tree) {
 			std::cout << "Root couldn't find LHEF tree in the input root file.\n";
-			return 1;
+			continue;
 		}
 		branch = tree->GetBranch("Particle");
 		if(!branch) {
 			std::cout << "Root couldn't find Particle branch in the LHEF tree.\n";
-			return 1;
+			continue;
 		}
 		if(first){
 		    first = false;
-		    Init(file, branch);
+		    Init(&file, branch);
 		}
-		if(Analyze(file, branch))
-		    return 1;
-
-		delete file;
+		if(Analyze(&file, branch))
+		    continue;
 	}
 	
 	UnInit();
@@ -700,7 +701,7 @@ void SensitivityAnalysis::UnInit() {
         N_ex.push_back(nu_energy->GetBinContent(i));
         cs_mean.push_back(theta_avg->GetBinContent(i));
     }
-    for(auto i = N_th.begin(); i!=N_th.end(); ++i)
+    /*for(auto i = N_th.begin(); i!=N_th.end(); ++i)
         std::cout << *i << " ";
     std::cout << std::endl << std::endl;
     for(auto i = N_ex.begin(); i!=N_ex.end(); ++i)
@@ -708,9 +709,9 @@ void SensitivityAnalysis::UnInit() {
     std::cout << std::endl << std::endl;
     for(auto i = cs_mean.begin(); i!=cs_mean.end(); ++i)
         std::cout << *i << " ";
-    std::cout << std::endl << std::endl;
+    std::cout << std::endl << std::endl;*/
     chisqr = chisq_pullfunc(N_th, N_ex, cs_mean);
-    std::cout << "Chisqr is " << chisqr << std::endl;
+    /*std::cout << "Chisqr is " << chisqr << std::endl;*/
     
     delete dm_energy;
     delete nu_energy;
@@ -722,11 +723,11 @@ SensitivityScan::SensitivityScan() {
 }
 
 int SensitivityScan::Process(const std::vector<std::string>& folders){
-    std::vector<double> xsections, chisqr, masses, chisqr1d, masses1d;
+    std::vector<double> mixings, chisqr, masses, chisqr1d, masses1d;
     double chiscan;
     double ivpmass, ichimass, ialpha, ikappa;
     double vpmass, chimass, alpha, kappa;
-    if(DMParameters(folders[0], ivpmass, ichimass, ialpha, ikappa)){
+    if(DMParameters(folders[0], ivpmass, ichimass, ikappa, ialpha)){
         std::cout << "Couldn't read DM parameters from " << folders[0] << std::endl;
         return 1;
     }
@@ -737,21 +738,21 @@ int SensitivityScan::Process(const std::vector<std::string>& folders){
         if(S_ISDIR(st.st_mode))
         {
             std::cout << *i << std::endl;
-            if(DMParameters(*i, vpmass, chimass, alpha, kappa)){
+            if(DMParameters(*i, vpmass, chimass, kappa, alpha)){
                 std::cout << "Couldn't read DM parameters!\n";
-                return 1;
+                continue;
             }
             SensitivityAnalysis analysis;
             if(analysis.Process(*i)){
                 std::cout << "Processing failed!\n";
-                return 1;
+                continue;
             }
             if(analysis.xsection!=analysis.xsection)
             {
                 std::cout << "Calculated a nan xsection!\n";
-                return 1;
+                continue;
             }
-            xsections.push_back(std::pow(kappa,2)*alpha*std::pow(chimass/vpmass,4));
+            mixings.push_back(std::pow(kappa,2)*alpha*std::pow(chimass/vpmass,4));
             chisqr.push_back(analysis.chisqr);
             masses.push_back(chimass);
             if(ivpmass==vpmass && ialpha==alpha && ikappa==kappa){
@@ -761,7 +762,7 @@ int SensitivityScan::Process(const std::vector<std::string>& folders){
         }
     }
     
-    if(xsections.size()==0){
+    if(mixings.size()==0){
         std::cout << "No sensitivities were scanned...\n";
         return 1;
     }
@@ -771,30 +772,57 @@ int SensitivityScan::Process(const std::vector<std::string>& folders){
     sstitle1 << "Sensitivity M_{vp}=" << ivpmass << " #kappa=" << ikappa << " #alpha=" << ialpha << ";M_{#chi} (GeV);#Chi^{2}";
     
     sstitle2 << std::fixed << std::setprecision(3);
-    sstitle2 << "90% Sensitivity #alpha=" << ialpha << ";M_{#chi} (GeV);#rho_{#chi}";
+    sstitle2 << "Sensitivity #alpha=" << ialpha << ";m_{#Chi} (GeV);y=#epsilon^{2}#alpha(m_{#Chi}/m_{A'})^{4}";
     
     std::string title1 = sstitle1.str();
     std::string title2 = sstitle2.str();
     
     TCanvas* canvas = new TCanvas("c1","canvas",1024,576);
-    TGraph* graph = new TGraph(masses1d.size(),masses1d.data(),chisqr1d.data());
+    /*TGraph* graph = new TGraph(masses1d.size(),masses1d.data(),chisqr1d.data());
     graph->SetTitle(title1.c_str());
     graph->Draw("");
     canvas->Update();
-    canvas->SaveAs("Sensitivity.png");
+    canvas->SaveAs("Sensitivity.png");*/
+    canvas->SetLogx();
+    canvas->SetLogy();
+    canvas->SetLogz();
     
-    TGraph2D* graph2 = new TGraph2D(masses.size(),masses.data(),xsections.data(),chisqr.data());
-    graph2->SetTitle(title2.c_str());
-    graph2->Draw("CONT1Z");
-    double level = 0.9;
-    //graph2->GetHistogram()->SetContour(1, &level);
-    //graph2->GetXaxis()->SetRangeUser(0,10);
-    //graph2->GetYaxis()->SetRangeUser(0,100);
+    TH2D hist("blah",title2.c_str(),1,0.1,3,1,1e-7,2e-5);
+    hist.SetStats(false);
+    TGraph2D* graph2 = new TGraph2D(masses.size(),masses.data(),mixings.data(),chisqr.data());
+    
+    hist.Draw("");
+    graph2->Draw("SAME CONT1Z");
+    for(auto i = masses.begin(); i!=masses.end(); ++i)
+    {
+        for(auto o = mixings.begin(); o!=mixings.end(); ++o)
+        {
+            TMarker* m = new TMarker(*i, *o, 0);
+            m->Draw("");
+        }
+    }
     canvas->Update();
-    canvas->SaveAs("Sensitivity2.png");
+    graph2->GetZaxis()->SetRangeUser(1e-4, 1e3);
+    canvas->SaveAs("SensitivityContours.png");
+    
+    double level = 0.9;
+    graph2->GetHistogram()->SetContour(1, &level);
+    hist.Draw("");
+    graph2->Draw("SAME CONT1Z");
+    for(auto i = masses.begin(); i!=masses.end(); ++i)
+    {
+        for(auto o = mixings.begin(); o!=mixings.end(); ++o)
+        {
+            TMarker* m = new TMarker(*i, *o, 0);
+            m->Draw("");
+        }
+    }
+    canvas->Update();
+    graph2->GetZaxis()->SetRangeUser(1e-4, 1e3);
+    canvas->SaveAs("Sensitivity90.png");
     
     delete graph2;
-    delete graph;
+    //delete graph;
     delete canvas;
 }
 
