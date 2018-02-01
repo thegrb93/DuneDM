@@ -9,7 +9,6 @@
 #include <functional>
 
 #include <TCanvas.h>
-#include <TVectorD.h>
 #include <TFile.h>
 #include <TTree.h>
 #include <THStack.h>
@@ -21,6 +20,7 @@
 #include <TGraph2D.h>
 #include <TLegend.h>
 #include <TMarker.h>
+#include <TStyle.h>
 #include <fstream>
 #include <TApplication.h>
 #include <dirent.h>
@@ -318,17 +318,33 @@ void iterateDarkmatter(int detitr, TBranch* branch, double vpmass, double chimas
     Particle electron(emass);
 
     long long nentries = branch->GetEntries();
+    if(nentries==0){std::cout << "The root file contains no entries!" << std::endl; return;}
+    branch->GetEntry(0);
+    int darkmatter_index = -1, antidarkmatter_index = -1;
+    for(Int_t i = 0; i < array->GetSize(); ++i)
+    {
+        TRootLHEFParticle* particle = (TRootLHEFParticle*)array->At(i);
+        if(particle){
+            int PID = particle->PID;
+            if(PID == 33) darkmatter_index = i;
+            if(PID == -33) antidarkmatter_index = i;
+        }
+    }
+    if(darkmatter_index==-1){std::cout << "The array does not contain darkmatter!" << std::endl; return;}
+    if(antidarkmatter_index==-1){std::cout << "The array does not contain antidarkmatter!" << std::endl; return;}
     for(Int_t i = 0; i < nentries; ++i)
     {
 		branch->GetEntry(i);
-        TRootLHEFParticle* particle = (TRootLHEFParticle*)array->At(2);
-        if(particle->PID!=33){
-            std::cout << "Error! This is not DarkMatter!\n";
-            exit(1);
-        }
+        TRootLHEFParticle* lhefdarkmatter = (TRootLHEFParticle*)array->At(darkmatter_index);
+        TRootLHEFParticle* lhefantidarkmatter = (TRootLHEFParticle*)array->At(antidarkmatter_index);
+        /*std::cout << ((TRootLHEFParticle*)array->At(0))->PID << std::endl;
+        std::cout << ((TRootLHEFParticle*)array->At(1))->PID << std::endl;
+        std::cout << ((TRootLHEFParticle*)array->At(2))->PID << std::endl;
+        std::cout << ((TRootLHEFParticle*)array->At(3))->PID << std::endl;
+        std::cout << ((TRootLHEFParticle*)array->At(4))->PID << std::endl;*/
         
         double tmin, tmax;
-        darkmatter.FourMomentum(particle->Px,particle->Py,-particle->Pz,particle->E);
+        darkmatter.FourMomentum(lhefdarkmatter->Px,lhefdarkmatter->Py,-lhefdarkmatter->Pz,lhefdarkmatter->E);
         darkmatter.calcOptionalKinematics();
         if(det.intersect(darkmatter.normpx, darkmatter.normpy, darkmatter.normpz, tmin, tmax))
         {
@@ -555,7 +571,7 @@ void DetectorAnalysis::Init(TFile* file, TBranch* branch) {
 	smear_sigma = 0.06;
 	
 	std::stringstream runname;
-	runname << std::fixed << std::setprecision(3) << "DM_" << vpmass << "_" << chimass << "_" << kappa << "_" << alpha;
+	runname << std::fixed << std::setprecision(6) << "DM_" << vpmass << "_" << chimass << "_" << kappa << "_" << alpha;
 	hists = new DMHistograms(runname.str());
 	
 	if(!hists->found_nu_output){
@@ -595,7 +611,7 @@ int DetectorAnalysis::Analyze(TFile* file, TBranch* branch) {
         file->GetObject("zmomentum", Pz);
         file->GetObject("theta", Th);
         file->GetObject("phi", Phi);
-        hists->AddProductionDM(E, Px, Py, Pz, Th, Phi);
+        if(E) hists->AddProductionDM(E, Px, Py, Pz, Th, Phi);
     }
 
     iterateDarkmatter((int)dm_detector_scale, branch, vpmass, chimass, kappa, alpha,
@@ -611,9 +627,11 @@ int DetectorAnalysis::Analyze(TFile* file, TBranch* branch) {
 
 void DetectorAnalysis::UnInit() {
     double desired_pot = 6e20;
-    double dm_pot = std::pow(files.size(),2)/(12*xsection*1e-40*100*6.022140857e23);
-    double dm_scale = desired_pot/dm_pot;
-    hists->ScaleDarkmatter(dm_scale, dm_scale/dm_detector_scale);
+    if(xsection!=0){
+        double dm_pot = std::pow(files.size(),2)/(12*xsection*1e-40*100*6.022140857e23);
+        double dm_scale = desired_pot/dm_pot;
+        hists->ScaleDarkmatter(dm_scale, dm_scale/dm_detector_scale);
+    }
     hists->SaveHistograms();
 
     delete hists;
@@ -630,12 +648,24 @@ SensitivityAnalysis::SensitivityAnalysis(){
 	xsection = 0;
 	dm_detector_scale = 100;
 	nu_detector_scale = 1000;
-	
-	const char* nufile = "data/nu_energies.root";
+	loadedDM = false;
+}
+
+SensitivityAnalysis::~SensitivityAnalysis(){
+}
+
+void SensitivityAnalysis::Init(TFile* file, TBranch* branch) {
+    mkdir("detector", S_IRWXU | S_IRWXG | S_IRWXO);
+	const char* nufile = "detector/nu_energies.root";
 	struct stat buffer;
-    if(stat(nufile, &buffer) != 0)
+    if(stat(nufile, &buffer) == 0)
     {
-        TFile file(nufile, "NEW");
+        nu_cache = new TFile(nufile);
+        nu_cache->GetObject("nuenergy", nu_energy);
+    }
+    else
+    {
+        nu_cache = new TFile(nufile, "NEW");
         nu_energy = new TH1D("nuenergy","nuenergy",20,0.3,2);
         iterateNeutrino((int)nu_detector_scale,
         [=](Particle&, double){},
@@ -647,28 +677,38 @@ SensitivityAnalysis::SensitivityAnalysis(){
                 nu_energy->Fill(E, weight);
             }
         });
-        file.cd();
         nu_energy->Scale(1/nu_detector_scale);
-        file.Write();
+        nu_cache->Write();
     }
     
-    nu_cache = new TFile(nufile);
-    nu_cache->GetObject("nuenergy", nu_energy);
-    dm_energy = new TH1D("nth","nth",20,0.3,2);
-	theta_avg = new TProfile("theta","theta",20,0.3,2);
-}
-
-SensitivityAnalysis::~SensitivityAnalysis(){
-}
-
-void SensitivityAnalysis::Init(TFile* file, TBranch* branch) {
+	std::stringstream dmfile;
+	dmfile << "detector/DM_" << std::fixed << std::setprecision(6) << vpmass << "_" << chimass << "_" << kappa << "_" << alpha << ".root";
+	std::string sdmfile = dmfile.str();
+    if(stat(sdmfile.c_str(), &buffer) == 0)
+    {
+        dm_cache = new TFile(sdmfile.c_str());
+        dm_cache->GetObject("nth", dm_energy);
+        dm_cache->GetObject("theta", theta_avg);
+        dm_cache->GetObject("xsection", xsection);
+        loadedDM = true;
+    }
+    else
+    {
+        dm_cache = new TFile(sdmfile.c_str(), "NEW");
+        dm_energy = new TH1D("nth","nth",20,0.3,2);
+	    theta_avg = new TProfile("theta","theta",20,0.3,2);
+	    xsection = new TVectorD(1);
+	    xsection->operator()(0) = 0;
+        loadedDM = false;
+    }
 }
 
 int SensitivityAnalysis::Analyze(TFile* file, TBranch* branch) {
+    if(loadedDM) return 0;
     TVectorD *v;
 	file->GetObject("xsection", v);
 	if(v)
-	    xsection += v->operator()(0);
+	    xsection->operator()(0) += v->operator()(0);
 	else
 		std::cout << "Root couldn't find crosssection object in file.\n";
 	
@@ -687,8 +727,14 @@ int SensitivityAnalysis::Analyze(TFile* file, TBranch* branch) {
 }
 
 void SensitivityAnalysis::UnInit() {
+    if(!loadedDM)
+    {
+        dm_cache->cd();
+        xsection->Write();
+        dm_cache->Write();
+    }
     double desired_pot = 6e20;
-    double dm_pot = std::pow(files.size(),2)/(12*xsection*1e-40*100*6.022140857e23);
+    double dm_pot = std::pow(files.size(),2)/(12*xsection->operator()(0)*1e-40*100*6.022140857e23);
     double nu_pot = 25000000;
     
     dm_energy->Scale(desired_pot/dm_pot/dm_detector_scale);
@@ -711,12 +757,13 @@ void SensitivityAnalysis::UnInit() {
         std::cout << *i << " ";
     std::cout << std::endl << std::endl;*/
     chisqr = chisq_pullfunc(N_th, N_ex, cs_mean);
-    /*std::cout << "Chisqr is " << chisqr << std::endl;*/
+    std::cout << "Chisqr is " << chisqr << std::endl;
     
     delete dm_energy;
     delete nu_energy;
     delete theta_avg;
     delete nu_cache;
+    delete dm_cache;
 }
 
 SensitivityScan::SensitivityScan() {
@@ -747,9 +794,9 @@ int SensitivityScan::Process(const std::vector<std::string>& folders){
                 std::cout << "Processing failed!\n";
                 continue;
             }
-            if(analysis.xsection!=analysis.xsection)
+            if(analysis.chisqr!=analysis.chisqr)
             {
-                std::cout << "Calculated a nan xsection!\n";
+                std::cout << "Calculated a nan chisqr!\n";
                 continue;
             }
             mixings.push_back(std::pow(kappa,2)*alpha*std::pow(chimass/vpmass,4));
@@ -768,10 +815,10 @@ int SensitivityScan::Process(const std::vector<std::string>& folders){
     }
     
     std::stringstream sstitle1, sstitle2;
-    sstitle1 << std::fixed << std::setprecision(3);
+    sstitle1 << std::setprecision(6);
     sstitle1 << "Sensitivity M_{vp}=" << ivpmass << " #kappa=" << ikappa << " #alpha=" << ialpha << ";M_{#chi} (GeV);#Chi^{2}";
     
-    sstitle2 << std::fixed << std::setprecision(3);
+    sstitle2 << std::setprecision(6);
     sstitle2 << "Sensitivity #alpha=" << ialpha << ";m_{#Chi} (GeV);y=#epsilon^{2}#alpha(m_{#Chi}/m_{A'})^{4}";
     
     std::string title1 = sstitle1.str();
@@ -787,12 +834,13 @@ int SensitivityScan::Process(const std::vector<std::string>& folders){
     canvas->SetLogy();
     canvas->SetLogz();
     
-    TH2D hist("blah",title2.c_str(),1,0.1,3,1,1e-7,2e-5);
-    hist.SetStats(false);
+    gStyle->SetPalette(55);
+    //TH2D hist("blah",title2.c_str(),1,0.1,3,1,1e-7,2e-5);
+    //hist.SetStats(false);
     TGraph2D* graph2 = new TGraph2D(masses.size(),masses.data(),mixings.data(),chisqr.data());
     
-    hist.Draw("");
-    graph2->Draw("SAME CONT1Z");
+    //hist.Draw("");
+    graph2->Draw("CONT1Z");
     for(auto i = masses.begin(); i!=masses.end(); ++i)
     {
         for(auto o = mixings.begin(); o!=mixings.end(); ++o)
@@ -802,13 +850,13 @@ int SensitivityScan::Process(const std::vector<std::string>& folders){
         }
     }
     canvas->Update();
-    graph2->GetZaxis()->SetRangeUser(1e-4, 1e3);
+    //graph2->GetZaxis()->SetRangeUser(1e-4, 1e3);
     canvas->SaveAs("SensitivityContours.png");
     
     double level = 0.9;
     graph2->GetHistogram()->SetContour(1, &level);
-    hist.Draw("");
-    graph2->Draw("SAME CONT1Z");
+    //hist.Draw("");
+    graph2->Draw("CONT1Z");
     for(auto i = masses.begin(); i!=masses.end(); ++i)
     {
         for(auto o = mixings.begin(); o!=mixings.end(); ++o)
@@ -818,7 +866,7 @@ int SensitivityScan::Process(const std::vector<std::string>& folders){
         }
     }
     canvas->Update();
-    graph2->GetZaxis()->SetRangeUser(1e-4, 1e3);
+    //graph2->GetZaxis()->SetRangeUser(1e-4, 1e3);
     canvas->SaveAs("Sensitivity90.png");
     
     delete graph2;

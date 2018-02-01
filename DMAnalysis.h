@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include <TROOT.h>
+#include <TVectorD.h>
 
 class TApplication;
 extern TApplication* gApp;
@@ -69,10 +70,12 @@ class SensitivityAnalysis : public DMAnalysis
 	double smear_mean;
 	TH1D *dm_energy, *nu_energy;
 	TProfile *theta_avg;
-	TFile* nu_cache;
+	TFile* nu_cache, *dm_cache;
+	TVectorD* xsection;
+	bool loadedDM;
 public:
     double dm_detector_scale, nu_detector_scale;
-    double chisqr, xsection;
+    double chisqr;
 	SensitivityAnalysis();
 	~SensitivityAnalysis();
 protected:
