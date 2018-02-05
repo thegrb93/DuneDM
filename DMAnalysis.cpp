@@ -689,7 +689,7 @@ void SensitivityAnalysis::Init(TFile* file, TBranch* branch) {
         dm_cache = new TFile(sdmfile.c_str());
         dm_cache->GetObject("nth", dm_energy);
         dm_cache->GetObject("theta", theta_avg);
-        dm_cache->GetObject("xsection", xsection);
+        dm_cache->GetObject("TVectorT<double>", xsection);
         loadedDM = true;
     }
     else
@@ -759,6 +759,7 @@ void SensitivityAnalysis::UnInit() {
     chisqr = chisq_pullfunc(N_th, N_ex, cs_mean);
     std::cout << "Chisqr is " << chisqr << std::endl;
     
+    delete xsection;
     delete dm_energy;
     delete nu_energy;
     delete theta_avg;
@@ -799,7 +800,8 @@ int SensitivityScan::Process(const std::vector<std::string>& folders){
                 std::cout << "Calculated a nan chisqr!\n";
                 continue;
             }
-            mixings.push_back(std::pow(kappa,2)*alpha*std::pow(chimass/vpmass,4));
+            double mixing = std::pow(kappa,2)*alpha*std::pow(chimass/vpmass,4);
+            mixings.push_back(mixing);
             chisqr.push_back(analysis.chisqr);
             masses.push_back(chimass);
             if(ivpmass==vpmass && ialpha==alpha && ikappa==kappa){
@@ -813,6 +815,18 @@ int SensitivityScan::Process(const std::vector<std::string>& folders){
         std::cout << "No sensitivities were scanned...\n";
         return 1;
     }
+    /*double minx = *std::min_element(masses.begin(), masses.end());
+    double maxx = *std::max_element(masses.begin(), masses.end());
+    double miny = *std::min_element(mixings.begin(), mixings.end());
+    double maxy = *std::max_element(mixings.begin(), mixings.end());
+    double xscale = maxx/minx/100.0;
+    double yscale = maxy/miny/100.0;
+    masses.push_back(minx/xscale);
+    masses.push_back(maxx*xscale);
+    mixings.push_back(miny/yscale);
+    mixings.push_back(maxy*yscale);
+    chisqr.push_back(0);
+    chisqr.push_back(0);*/
     
     std::stringstream sstitle1, sstitle2;
     sstitle1 << std::setprecision(6);
@@ -825,50 +839,50 @@ int SensitivityScan::Process(const std::vector<std::string>& folders){
     std::string title2 = sstitle2.str();
     
     TCanvas* canvas = new TCanvas("c1","canvas",1024,576);
-    /*TGraph* graph = new TGraph(masses1d.size(),masses1d.data(),chisqr1d.data());
-    graph->SetTitle(title1.c_str());
-    graph->Draw("");
-    canvas->Update();
-    canvas->SaveAs("Sensitivity.png");*/
     canvas->SetLogx();
     canvas->SetLogy();
     canvas->SetLogz();
     
     gStyle->SetPalette(55);
-    //TH2D hist("blah",title2.c_str(),1,0.1,3,1,1e-7,2e-5);
-    //hist.SetStats(false);
+    //gStyle->SetNumberContours(100);
+    
     TGraph2D* graph2 = new TGraph2D(masses.size(),masses.data(),mixings.data(),chisqr.data());
+    graph2->SetNpx(500);
+    graph2->SetNpy(500);
+    graph2->SetTitle(title2.c_str());
     
     //hist.Draw("");
+    //graph2->Draw("col box scat");
+    //graph2->Draw("SAME CONT1Z");
     graph2->Draw("CONT1Z");
-    for(auto i = masses.begin(); i!=masses.end(); ++i)
+    
+    std::vector<TMarker*> markers;
+    for(int i = 0; i<masses.size(); ++i)
     {
-        for(auto o = mixings.begin(); o!=mixings.end(); ++o)
-        {
-            TMarker* m = new TMarker(*i, *o, 0);
-            m->Draw("");
-        }
+        TMarker* m = new TMarker(masses[i], mixings[i], 0);
+        m->SetMarkerStyle(7);
+        m->Draw("");
+        markers.push_back(m);
     }
     canvas->Update();
-    //graph2->GetZaxis()->SetRangeUser(1e-4, 1e3);
     canvas->SaveAs("SensitivityContours.png");
     
     double level = 0.9;
     graph2->GetHistogram()->SetContour(1, &level);
+    
     //hist.Draw("");
+    //graph2->Draw("col box scat");
+    //graph2->Draw("SAME CONT1Z");
     graph2->Draw("CONT1Z");
-    for(auto i = masses.begin(); i!=masses.end(); ++i)
-    {
-        for(auto o = mixings.begin(); o!=mixings.end(); ++o)
-        {
-            TMarker* m = new TMarker(*i, *o, 0);
-            m->Draw("");
-        }
-    }
+    
+    for(auto i = markers.begin(); i!=markers.end(); ++i)
+        (*i)->Draw("SAME");
     canvas->Update();
     //graph2->GetZaxis()->SetRangeUser(1e-4, 1e3);
     canvas->SaveAs("Sensitivity90.png");
     
+    for(auto i = markers.begin(); i!=markers.end(); ++i)
+        delete *i;
     delete graph2;
     //delete graph;
     delete canvas;
