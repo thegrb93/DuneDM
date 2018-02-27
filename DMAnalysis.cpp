@@ -18,6 +18,7 @@
 #include <TF1.h>
 #include <TChain.h>
 #include <TGraph2D.h>
+#include <TGaxis.h>
 #include <TLegend.h>
 #include <TMarker.h>
 #include <TStyle.h>
@@ -37,6 +38,9 @@
 #include "Random.h"
 
 const double emass = 0.000511;
+double desired_pot = 1.47e21; //80GeV
+//double desired_pot = 1.1e21; //120GeV
+double nu_pot = 25000000;
 
 void getFolderFiles(std::string path, std::vector<std::string>& files) {
     DIR *dpdf;
@@ -53,22 +57,22 @@ void getFolderFiles(std::string path, std::vector<std::string>& files) {
 
 std::regex param_match(".*?DM_([\\d\\.]+)_([\\d\\.]+)_([\\d\\.]+)_([\\d\\.]+).*");
 int DMParameters(const std::string& filen, double& vpmass, double& chimass, double& kappa, double& alpha/*, double& xsection*/) {
-	std::smatch matches;
-	if(!std::regex_match(filen, matches, param_match)) goto error;
+    std::smatch matches;
+    if(!std::regex_match(filen, matches, param_match)) goto error;
 
-	{
-		std::stringstream parser;
-		parser << matches[1];
-		parser >> vpmass;
-		if(parser.bad()) goto error;
-		parser.clear();
-		parser << matches[2];
-		parser >> chimass;
-		if(parser.bad()) goto error;
-		parser.clear();
-		parser << matches[3];
-		parser >> kappa;
-		if(parser.bad()) goto error;
+    {
+        std::stringstream parser;
+        parser << matches[1];
+        parser >> vpmass;
+        if(parser.bad()) goto error;
+        parser.clear();
+        parser << matches[2];
+        parser >> chimass;
+        if(parser.bad()) goto error;
+        parser.clear();
+        parser << matches[3];
+        parser >> kappa;
+        if(parser.bad()) goto error;
         parser.clear();
         parser << matches[4];
         parser >> alpha;
@@ -77,15 +81,15 @@ int DMParameters(const std::string& filen, double& vpmass, double& chimass, doub
         parser << matches[5];
         parser >> xsection;
         if(parser.bad()) goto error;*/
-		return 0;
-	}
-	
-	error:;
-	std::cout << "Tried to parse invalid filename: " << filen << std::endl;
-	return 1;
+        return 0;
+    }
+    
+    error:;
+    std::cout << "Tried to parse invalid filename: " << filen << std::endl;
+    return 1;
 }
 
-inline void calculateNeutrinoNearDetector(int ptype, int Ntype, double ppenergy, double ppdxdz, double ppdydz, double pppz, double Necm, double pdPx, double pdPy, double pdPz, double Vx, double Vy, double Vz, double mupare, double muparpx, double muparpy, double muparpz, double Nimpwt, double& nu_energy, double& weight) {
+inline void calculateNeutrinoNearDetector(int ptype, int Ntype, double ppenergy, double ppdxdz, double ppdydz, double pppz, double Necm, double pdPx, double pdPy, double pdPz, double Vx, double Vy, double Vz, double mupare, double muparpx, double muparpy, double muparpz, double Nimpwt, double& nu_energy, double p_nu[3], double& weight) {
     const double detx = 0.0;
     const double dety = 0.0;
     const double detz = 57400.0;
@@ -152,7 +156,6 @@ inline void calculateNeutrinoNearDetector(int ptype, int Ntype, double ppenergy,
     {
         //boost new neutrino to mu decay cm
         double beta[3];
-        double p_nu[3]; //nu momentum
         beta[0]=pdPx / parent_energy;
         beta[1]=pdPy / parent_energy;
         beta[2]=pdPz / parent_energy;
@@ -228,8 +231,16 @@ inline void calculateNeutrinoNearDetector(int ptype, int Ntype, double ppenergy,
 void iterateNeutrino(int detector_scale,
     std::function<void(Particle&, double)> fproduction,
     std::function<void(Particle&, double, double, double)> fdetector,
-    std::function<void(Particle&, Particle&, Particle&, double)> fscatter
+    std::function<void(Particle&, Particle&, Particle&, double, double)> fscatter
 ){
+    std::string neutrino_path = options["neutrinos"].as<std::string>();
+    struct stat buffer;
+    if(stat(neutrino_path.c_str(), &buffer))
+    {
+        std::cout << "Failed to open neutrino directory. \"" << neutrino_path << "\".\n";
+        return;
+    }
+
     DUNEDetector det;
     DMscattering scatter;
 
@@ -237,11 +248,15 @@ void iterateNeutrino(int detector_scale,
     Particle electron(emass);
 
     std::vector<std::string> neutrino_files;
-    getFolderFiles("data/neutrinos", neutrino_files);
+    getFolderFiles(neutrino_path, neutrino_files);
     for (auto filen = neutrino_files.begin(); filen != neutrino_files.end(); ++filen) {
         TFile *neutrinos = new TFile(filen->c_str());
         std::cout << neutrinos->GetPath() << std::endl;
         TTree *neutrino_tree = (TTree *) neutrinos->Get("nudata");
+        if(!neutrino_tree){
+            delete neutrinos;
+            continue;
+        }
         neutrino_tree->SetMakeClass(1);
         int ptype, Ntype;
         float Necm, ndxdz, ndydz, ndz, pdPx, pdPy, pdPz, Vx, Vy, Vz, ppenergy, ppdxdz, ppdydz, pppz, mupare, muparpx, muparpy, muparpz;
@@ -277,10 +292,13 @@ void iterateNeutrino(int detector_scale,
         //for (long long i = 0; i < neutrino_entries; ++i) {
         //for(long long i = 0, j = 0; j < neutrino_total; i=(i+1)%neutrino_entries, ++j) {
             neutrino_tree->GetEvent(i);
-            //double energy, weight;
-            //calculateNeutrinoNearDetector(ptype, Ntype, ppenergy, ppdxdz, ppdydz, pppz, Necm, pdPx, pdPy, pdPz, Vx, Vy, Vz, mupare, muparpx, muparpy, muparpz, Nimpwt, energy, weight);
-            double weight = Nimpwt * NWtNear[0];
-            neutrino.FourMomentum(ndxdz*ndz, ndydz*ndz, ndz, NenergyN[0]);
+            double p_nu[3];
+            double energy, weight;
+            calculateNeutrinoNearDetector(ptype, Ntype, ppenergy, ppdxdz, ppdydz, pppz, Necm, pdPx, pdPy, pdPz, Vx, Vy, Vz, mupare, muparpx, muparpy, muparpz, Nimpwt, energy, p_nu, weight);
+            neutrino.FourMomentum(p_nu[0], p_nu[1], p_nu[2], energy);
+            
+            //double weight = Nimpwt * NWtNear[0];
+            //neutrino.FourMomentum(ndxdz*ndz, ndydz*ndz, ndz, NenergyN[0]);
             neutrino.calcOptionalKinematics();
 
             fproduction(neutrino, weight);
@@ -290,11 +308,12 @@ void iterateNeutrino(int detector_scale,
                 double pathlength = tmax-tmin;
                 for(int j = 0; j<detector_scale; ++j){
                     if (scatter.probscatterNeutrino(neutrino, pathlength)) {
+                        double time = tmin / ( neutrino.norm / neutrino.E * 299792458.0 );
                         Particle neutrino2 = neutrino;
                         scatter.scattereventNeutrino(neutrino2, electron);
                         neutrino2.calcOptionalKinematics();
                         electron.calcOptionalKinematics();
-                        fscatter(neutrino, neutrino2, electron, weight);
+                        fscatter(neutrino, neutrino2, electron, time, weight);
                     }
                 }
             }
@@ -306,13 +325,13 @@ void iterateNeutrino(int detector_scale,
 
 void iterateDarkmatter(int detitr, TBranch* branch, double vpmass, double chimass, double kappa, double alpha,
     std::function<void(Particle&, double, double)> fdetector,
-    std::function<void(Particle&, Particle&, Particle&)> fscatter
+    std::function<void(Particle&, Particle&, Particle&, double)> fscatter
 ){
     DUNEDetector det;
-	DMscattering scatter;
+    DMscattering scatter;
 
-	TClonesArray* array = new TClonesArray("TRootLHEFParticle", 5);
-	branch->SetAddress(&array);
+    TClonesArray* array = new TClonesArray("TRootLHEFParticle", 5);
+    branch->SetAddress(&array);
 
     Particle darkmatter(chimass);
     Particle electron(emass);
@@ -332,36 +351,40 @@ void iterateDarkmatter(int detitr, TBranch* branch, double vpmass, double chimas
     }
     if(darkmatter_index==-1){std::cout << "The array does not contain darkmatter!" << std::endl; return;}
     if(antidarkmatter_index==-1){std::cout << "The array does not contain antidarkmatter!" << std::endl; return;}
-    for(Int_t i = 0; i < nentries; ++i)
-    {
-		branch->GetEntry(i);
-        TRootLHEFParticle* lhefdarkmatter = (TRootLHEFParticle*)array->At(darkmatter_index);
-        TRootLHEFParticle* lhefantidarkmatter = (TRootLHEFParticle*)array->At(antidarkmatter_index);
-        /*std::cout << ((TRootLHEFParticle*)array->At(0))->PID << std::endl;
-        std::cout << ((TRootLHEFParticle*)array->At(1))->PID << std::endl;
-        std::cout << ((TRootLHEFParticle*)array->At(2))->PID << std::endl;
-        std::cout << ((TRootLHEFParticle*)array->At(3))->PID << std::endl;
-        std::cout << ((TRootLHEFParticle*)array->At(4))->PID << std::endl;*/
-        
-        double tmin, tmax;
-        darkmatter.FourMomentum(lhefdarkmatter->Px,lhefdarkmatter->Py,-lhefdarkmatter->Pz,lhefdarkmatter->E);
-        darkmatter.calcOptionalKinematics();
-        if(det.intersect(darkmatter.normpx, darkmatter.normpy, darkmatter.normpz, tmin, tmax))
+    auto doIterations = [&] (int index) {
+        for(Int_t i = 0; i < nentries; ++i)
         {
-            fdetector(darkmatter, tmin, tmax);
-            double pathlength = tmax-tmin;
-            for(int j = 0; j<detitr; ++j){
-                if(scatter.probscatter(vpmass,chimass,kappa,alpha,darkmatter,pathlength)) {
-                    Particle darkmatter2 = darkmatter;
-                    scatter.scatterevent(vpmass, chimass, kappa, alpha, darkmatter2, electron);
-                    darkmatter2.calcOptionalKinematics();
-                    electron.calcOptionalKinematics();
-                    fscatter(darkmatter, darkmatter2, electron);
+            branch->GetEntry(i);
+            TRootLHEFParticle* lhefdarkmatter = (TRootLHEFParticle*)array->At(index);
+            /*std::cout << ((TRootLHEFParticle*)array->At(0))->PID << std::endl;
+            std::cout << ((TRootLHEFParticle*)array->At(1))->PID << std::endl;
+            std::cout << ((TRootLHEFParticle*)array->At(2))->PID << std::endl;
+            std::cout << ((TRootLHEFParticle*)array->At(3))->PID << std::endl;
+            std::cout << ((TRootLHEFParticle*)array->At(4))->PID << std::endl;*/
+            
+            double tmin, tmax;
+            darkmatter.FourMomentum(lhefdarkmatter->Px,lhefdarkmatter->Py,-lhefdarkmatter->Pz,lhefdarkmatter->E);
+            darkmatter.calcOptionalKinematics();
+            if(det.intersect(darkmatter.normpx, darkmatter.normpy, darkmatter.normpz, tmin, tmax))
+            {
+                fdetector(darkmatter, tmin, tmax);
+                double pathlength = tmax-tmin;
+                for(int j = 0; j<detitr; ++j){
+                    if(scatter.probscatter(vpmass,chimass,kappa,alpha,darkmatter,pathlength)) {
+                        double time = tmin / ( darkmatter.norm / darkmatter.E * 299792458.0 );
+                        Particle darkmatter2 = darkmatter;
+                        scatter.scatterevent(vpmass, chimass, kappa, alpha, darkmatter2, electron);
+                        darkmatter2.calcOptionalKinematics();
+                        electron.calcOptionalKinematics();
+                        fscatter(darkmatter, darkmatter2, electron, time);
+                    }
                 }
             }
         }
-	}
-	delete array;
+    };
+    doIterations(darkmatter_index);
+    doIterations(antidarkmatter_index);
+    delete array;
 }
 
 DMAnalysis::DMAnalysis() {
@@ -371,9 +394,9 @@ DMAnalysis::~DMAnalysis() {
 
 int DMAnalysis::Process(std::string folder) {
     if(DMParameters(folder, vpmass, chimass, kappa, alpha)){
-		std::cout << "Couldn't parse DM parameters.\n";
-		UnInit();
-		return 1;
+        std::cout << "Couldn't parse DM parameters.\n";
+        UnInit();
+        return 1;
     }
     
     getFolderFiles(folder, files);
@@ -384,36 +407,37 @@ int DMAnalysis::Process(std::string folder) {
     }
     
     bool first = true;
-	for(auto fname = files.begin(); fname!=files.end(); ++fname) {
-		TFile file(fname->c_str());
-		TTree* tree;
-		TBranch* branch;
-		
-		if(!file.IsOpen()) {
-			std::cout << "Failed to open file: " << file.GetName() << std::endl;
-			continue;
-		}
+    for(auto fname = files.begin(); fname!=files.end(); ++fname) {
+        TFile file(fname->c_str());
+        TTree* tree;
+        TBranch* branch;
+        
+        if(!file.IsOpen()) {
+            std::cout << "Failed to open file: " << file.GetName() << std::endl;
+            continue;
+        }
 
-		file.GetObject("LHEF",tree);
-		if(!tree) {
-			std::cout << "Root couldn't find LHEF tree in the input root file.\n";
-			continue;
-		}
-		branch = tree->GetBranch("Particle");
-		if(!branch) {
-			std::cout << "Root couldn't find Particle branch in the LHEF tree.\n";
-			continue;
-		}
-		if(first){
-		    first = false;
-		    Init(&file, branch);
-		}
-		if(Analyze(&file, branch))
-		    continue;
-	}
-	
-	UnInit();
-	return 0;
+        file.GetObject("LHEF",tree);
+        if(!tree) {
+            std::cout << "Root couldn't find LHEF tree in the input root file.\n";
+            continue;
+        }
+        branch = tree->GetBranch("Particle");
+        if(!branch) {
+            std::cout << "Root couldn't find Particle branch in the LHEF tree.\n";
+            continue;
+        }
+        if(first){
+            first = false;
+            if(Init(&file, branch))
+                return 1;
+        }
+        if(Analyze(&file, branch))
+            continue;
+    }
+    
+    UnInit();
+    return 0;
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -424,14 +448,14 @@ StatisticsAnalysis::StatisticsAnalysis(){
 }
 
 StatisticsAnalysis::~StatisticsAnalysis(){
-	delete graphchi2;
-	delete graphdmee;
+    delete graphchi2;
+    delete graphdmee;
     delete graphsig;
     delete graphbg;
-	delete neutrino_electron_e;
+    delete neutrino_electron_e;
 }
 
-void StatisticsAnalysis::Init(TFile*, TBranch*){
+int StatisticsAnalysis::Init(TFile*, TBranch*){
     graphchi2 = new TGraph2D((int)files.size());
     graphchi2->SetName("chi2");
     graphchi2->SetTitle("Dark Matter #chi^{2};VP mass(GeV);#chi mass(GeV);#chi^{2}");
@@ -443,23 +467,23 @@ void StatisticsAnalysis::Init(TFile*, TBranch*){
     graphbg = new TGraph2D((int)files.size());
     graphbg->SetName("bg");
     graphbg->SetTitle("Background;VP mass(GeV);#chi mass(GeV);Counts");
-	
-	graphdmee = new TGraph2D((int)files.size());
-	graphdmee->SetName("dmee");
-	graphdmee->SetTitle("Electron Scatter E against dm Mean;VP mass(GeV);#chi mass(GeV);E(GeV)");
+    
+    graphdmee = new TGraph2D((int)files.size());
+    graphdmee->SetName("dmee");
+    graphdmee->SetTitle("Electron Scatter E against dm Mean;VP mass(GeV);#chi mass(GeV);E(GeV)");
 
     neutrino_electron_e = new TH1D("nuee3","Nu-Electron Scatter E;E (GeV)", 100, 0, 6);
-	
-	iterateNeutrino(1,
-	[=](Particle& neutrino, double weight){
-	//nupz1->Fill(neutrino.pz, weight);
+    
+    iterateNeutrino(1,
+    [=](Particle& neutrino, double weight){
+    //nupz1->Fill(neutrino.pz, weight);
         //nue1->Fill(neutrino.E, weight);
     },
     [=](Particle& neutrino, double tmin, double tmax, double weight){
         //nupz2->Fill(neutrino.pz, weight);
         //nue2->Fill(neutrino.E, weight);
     },
-    [=](Particle&, Particle& neutrino, Particle& electron, double weight){
+    [=](Particle&, Particle& neutrino, Particle& electron, double time, double weight){
         //nupz3->Fill(neutrino.pz, weight);
         //nue3->Fill(neutrino.E, weight);
 
@@ -469,48 +493,50 @@ void StatisticsAnalysis::Init(TFile*, TBranch*){
         //double pnorm = sqrt(electron.px*electron.px+electron.py*electron.py+electron.pz*electron.pz);
         //nu_ethe1->Fill(acos(std::min<double>(std::max<double>(electron.pz/pnorm, -1), 1));
     });
+    
+    return 0;
 }
 
 int StatisticsAnalysis::Analyze(TFile* file, TBranch* branch){
-	TH1D* dm_electron_e = new TH1D("dme","DM-Electron Scatter E;E (GeV)", 100, 0, 6);
-	
-	iterateDarkmatter(1, branch, vpmass, chimass, kappa, alpha,
-	[=](Particle& darkmatter, double tmin, double tmax){
-	},
-	[=](Particle&, Particle&, Particle& electron){
-	    dm_electron_e->Fill(electron.E);
-	});
-	
-	double chi2 = 0;
-	for(int i = 1; i<=dm_electron_e->GetNbinsX(); ++i)
-	{
-		double N_bg = neutrino_electron_e->GetBinContent(i);
-		double N_tot = dm_electron_e->GetBinContent(i) + N_bg;
-		if(N_bg == 0) continue;
-		chi2 += 2*(N_bg*log(N_bg/N_tot) + N_tot - N_bg);
-	}
+    TH1D* dm_electron_e = new TH1D("dme","DM-Electron Scatter E;E (GeV)", 100, 0, 6);
+    
+    iterateDarkmatter(1, branch, vpmass, chimass, kappa, alpha,
+    [=](Particle& darkmatter, double tmin, double tmax){
+    },
+    [=](Particle&, Particle&, Particle& electron, double time){
+        dm_electron_e->Fill(electron.E);
+    });
+    
+    double chi2 = 0;
+    for(int i = 1; i<=dm_electron_e->GetNbinsX(); ++i)
+    {
+        double N_bg = neutrino_electron_e->GetBinContent(i);
+        double N_tot = dm_electron_e->GetBinContent(i) + N_bg;
+        if(N_bg == 0) continue;
+        chi2 += 2*(N_bg*log(N_bg/N_tot) + N_tot - N_bg);
+    }
 
     graphsig->SetPoint(index, vpmass, chimass, dm_electron_e->Integral());
-	graphchi2->SetPoint(index, vpmass, chimass, chi2);
-	graphdmee->SetPoint(index, vpmass, chimass, dm_electron_e->GetMean(1));
-	++index;
-	
-	delete dm_electron_e;
-	return 0;
+    graphchi2->SetPoint(index, vpmass, chimass, chi2);
+    graphdmee->SetPoint(index, vpmass, chimass, dm_electron_e->GetMean(1));
+    ++index;
+    
+    delete dm_electron_e;
+    return 0;
 }
 
 void StatisticsAnalysis::UnInit(){
-	/*mkdir("images", S_IRWXU | S_IRWXG | S_IRWXO);
-	std::string params(argv[2]);
-	std::string outputfilen(argv[3]);*/
+    /*mkdir("images", S_IRWXU | S_IRWXG | S_IRWXO);
+    std::string params(argv[2]);
+    std::string outputfilen(argv[3]);*/
 
-	TCanvas* canvas = new TCanvas("output", "", 1920,1080);
-	canvas->SetFillColor(33);
-	canvas->SetFrameFillColor(17);
-	canvas->SetGrid();
-	
-	canvas->SetTheta(-90);
-	canvas->SetPhi(-0.0001);
+    TCanvas* canvas = new TCanvas("output", "", 1920,1080);
+    canvas->SetFillColor(33);
+    canvas->SetFrameFillColor(17);
+    canvas->SetGrid();
+    
+    canvas->SetTheta(-90);
+    canvas->SetPhi(-0.0001);
 
     graphchi2->Draw("surf1 Z");
     canvas->Update();
@@ -520,18 +546,18 @@ void StatisticsAnalysis::UnInit(){
     canvas->Update();
     canvas->SaveAs("sig.png");
 
-	graphdmee->Draw("surf1 Z");
-	canvas->Update();
-	canvas->SaveAs("dme.png");
-	
-	neutrino_electron_e->Draw();
-	canvas->Update();
-	canvas->SaveAs("nue.png");
+    graphdmee->Draw("surf1 Z");
+    canvas->Update();
+    canvas->SaveAs("dme.png");
+    
+    neutrino_electron_e->Draw();
+    canvas->Update();
+    canvas->SaveAs("nue.png");
 
     /*canvas->Draw();
     gApp->Run();*/
 
-	delete canvas;
+    delete canvas;
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -539,70 +565,91 @@ void StatisticsAnalysis::UnInit(){
 ////////////////////////////////////////////////////////////////////
 DetectorAnalysis::DetectorAnalysis(){
     dm_detector_scale = 100;
+    nu_detector_scale = 1000;
     xsection = 0;
 }
 
 DetectorAnalysis::~DetectorAnalysis(){
 }
 
-void DetectorAnalysis::Init(TFile* file, TBranch* branch) {
-	//if(gOptions[OPT_DETECTOR])
-	//	detectorType = gOptions[OPT_DETECTOR].last()->arg;
-	//else
-    	detectorType = "DUNE";
+int DetectorAnalysis::Init(TFile* file, TBranch* branch) {
+    //if(gOptions[OPT_DETECTOR])
+    //  detectorType = gOptions[OPT_DETECTOR].last()->arg;
+    //else
+        detectorType = "DUNE";
 
-	if(detectorType=="DUNE")
-	{
-		smear_mean = 0;
-		smear_sigma = 0.06;
-	}
+    if(detectorType=="DUNE")
+    {
+        smear_mean = 0;
+        smear_sigma = 0.06;
+    }
     normalize_histos = false;
 
-	/*if(gOptions[OPT_DET_SMEAR_SIG])
-		smear_sigma = toDouble(gOptions[OPT_DET_SMEAR_SIG].last()->arg);
-	else
-		smear_sigma = 0;
-	
-	if(gOptions[OPT_DET_SMEAR_MEAN])
-		smear_mean = toDouble(gOptions[OPT_DET_SMEAR_MEAN].last()->arg);
-	else
-		smear_mean = 0;*/
-	smear_mean = 0;
-	smear_sigma = 0.06;
-	
-	std::stringstream runname;
-	runname << std::fixed << std::setprecision(6) << "DM_" << vpmass << "_" << chimass << "_" << kappa << "_" << alpha;
-	hists = new DMHistograms(runname.str());
-	
-	if(!hists->found_nu_output){
-	    double detector_scale = 1000;
-	    iterateNeutrino((int)detector_scale,
-	    [=](Particle& neutrino, double weight){
-            hists->AddProductionNu(neutrino.E, neutrino.pz, neutrino.pt, neutrino.theta, /*ntype,*/ weight);
-	    },
-	    [=](Particle& neutrino, double tmin, double tmax, double weight){
-	        hists->AddDetectorNu(neutrino.E, neutrino.pz, neutrino.pt, neutrino.theta, weight);
-	    },
-	    [=](Particle&, Particle& neutrino, Particle& electron, double weight){
-	        hists->AddScatterNu(neutrino.E, neutrino.pz, neutrino.pt, neutrino.theta, weight);
-            hists->AddScatterBgElectron(electron.E, electron.pz, electron.pt, electron.theta, weight);
-	    });
-	    
-        double desired_pot = 6e20;
-        double nu_pot = 250000000;
-        double scale = desired_pot/nu_pot;
-	    hists->ScaleNeutrinos(scale, scale/detector_scale);
+    /*if(gOptions[OPT_DET_SMEAR_SIG])
+        smear_sigma = toDouble(gOptions[OPT_DET_SMEAR_SIG].last()->arg);
+    else
+        smear_sigma = 0;
+    
+    if(gOptions[OPT_DET_SMEAR_MEAN])
+        smear_mean = toDouble(gOptions[OPT_DET_SMEAR_MEAN].last()->arg);
+    else
+        smear_mean = 0;*/
+    smear_mean = 0;
+    smear_sigma = 0.06;
+    
+    std::stringstream ssrunname;
+    ssrunname << std::fixed << std::setprecision(6) << "DM_" << vpmass << "_" << chimass << "_" << kappa << "_" << alpha;
+    std::string runname = ssrunname.str();
+    
+    std::string neutrino_path = options["neutrinos"].as<std::string>();
+    struct stat buffer;
+    if(stat(neutrino_path.c_str(), &buffer))
+    {
+        std::cout << "Failed to open neutrino directory. \"" << neutrino_path << "\".\n";
+        return 1;
     }
+    std::string neutrino_root = neutrino_path+"/neutrinos.root";
+    bool neutrino_exists = (stat(neutrino_root.c_str(), &buffer) == 0);
+    
+    mkdir("histograms", S_IRWXU | S_IRWXG | S_IRWXO);
+    mkdir("root", S_IRWXU | S_IRWXG | S_IRWXO);
+    mkdir(("histograms/"+runname).c_str(), S_IRWXU | S_IRWXG | S_IRWXO);
+
+    TFile* dm_output = new TFile(("root/"+runname+".root").c_str(), "RECREATE");
+    TFile* nu_output;
+    if(neutrino_exists)
+        nu_output = new TFile(neutrino_root.c_str(), "READ");
+    else
+        nu_output = new TFile(neutrino_root.c_str(), "CREATE");
+    
+    hists = new DMHistograms(runname, dm_output, nu_output, neutrino_exists);
+    
+    if(!neutrino_exists){
+        iterateNeutrino((int)nu_detector_scale,
+        [=](Particle& neutrino, double weight){
+            hists->AddProductionNu(neutrino.E, neutrino.pz, neutrino.pt, neutrino.theta, /*ntype,*/ weight);
+        },
+        [=](Particle& neutrino, double tmin, double tmax, double weight){
+            hists->AddDetectorNu(neutrino.E, neutrino.pz, neutrino.pt, neutrino.theta, weight);
+        },
+        [=](Particle&, Particle& neutrino, Particle& electron, double time, double weight){
+            hists->AddScatterNu(neutrino.E, neutrino.pz, neutrino.pt, neutrino.theta, weight);
+            hists->AddScatterBgElectron(electron.E, electron.pz, electron.pt, electron.theta, time, weight);
+        });
+        hists->SaveNeutrinos();
+    }
+    
+    return 0;
 }
 
 int DetectorAnalysis::Analyze(TFile* file, TBranch* branch) {
     TVectorD *v;
-	file->GetObject("xsection", v);
-	if(v)
-	    xsection += v->operator()(0);
-	else
-		std::cout << "Root couldn't find crosssection object in file.\n";
-	
+    file->GetObject("xsection", v);
+    if(v)
+        xsection += v->operator()(0);
+    else
+        std::cout << "Root couldn't find crosssection object in file.\n";
+    
     {
         TH1D* E, *Px, *Py, *Pz, *Th, *Phi;
         file->GetObject("energies", E);
@@ -618,19 +665,25 @@ int DetectorAnalysis::Analyze(TFile* file, TBranch* branch) {
     [=](Particle& darkmatter, double tmin, double tmax){
         hists->AddDetectorDM(darkmatter.E, darkmatter.normpx*tmin, darkmatter.normpy*tmin, darkmatter.px, darkmatter.py, darkmatter.pz, darkmatter.pt, darkmatter.theta, darkmatter.phi);
     },
-    [=](Particle&, Particle& darkmatter, Particle& electron){
+    [=](Particle&, Particle& darkmatter, Particle& electron, double time){
         hists->AddScatterDM(darkmatter.E, darkmatter.pz, darkmatter.pt, darkmatter.theta);
-        hists->AddScatterSigElectron(electron.E, electron.pz, electron.pt, electron.theta);
+        hists->AddScatterSigElectron(electron.E, electron.pz, electron.pt, electron.theta, time);
     });
     return 0;
 }
 
 void DetectorAnalysis::UnInit() {
-    double desired_pot = 6e20;
-    if(xsection!=0){
-        double dm_pot = std::pow(files.size(),2)/(12*xsection*1e-40*100*6.022140857e23);
-        double dm_scale = desired_pot/dm_pot;
-        hists->ScaleDarkmatter(dm_scale, dm_scale/dm_detector_scale);
+    if(normalize_histos){
+        hists->NormalizeHistograms();
+    }
+    else{
+        if(xsection!=0){
+            double dm_pot = std::pow(files.size(),2)/(12*xsection*1e-40*100*6.022140857e23);
+            double dm_scale = desired_pot/dm_pot;
+            hists->ScaleDarkmatter(dm_scale, dm_scale/dm_detector_scale);
+        }
+        double nu_scale = desired_pot/nu_pot;
+        hists->ScaleNeutrinos(nu_scale, nu_scale/nu_detector_scale);
     }
     hists->SaveHistograms();
 
@@ -641,36 +694,45 @@ void DetectorAnalysis::UnInit() {
 ////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////
 
-SensitivityAnalysis::SensitivityAnalysis(){	
-	smear_mean = 0;
-	smear_sigma = 0.06;
-	chisqr = 0;
-	xsection = 0;
-	dm_detector_scale = 100;
-	nu_detector_scale = 1000;
-	loadedDM = false;
+SensitivityAnalysis::SensitivityAnalysis(){ 
+    smear_mean = 0;
+    smear_sigma = 0.06;
+    chisqr = 0;
+    xsection = 0;
+    dm_detector_scale = 100;
+    nu_detector_scale = 1000;
+    loadedDM = false;
 }
 
 SensitivityAnalysis::~SensitivityAnalysis(){
 }
 
-void SensitivityAnalysis::Init(TFile* file, TBranch* branch) {
+int SensitivityAnalysis::Init(TFile* file, TBranch* branch) {
     mkdir("detector", S_IRWXU | S_IRWXG | S_IRWXO);
-	const char* nufile = "detector/nu_energies.root";
-	struct stat buffer;
-    if(stat(nufile, &buffer) == 0)
+    
+    std::string neutrino_path = options["neutrinos"].as<std::string>();
+    struct stat buffer;
+    if(stat(neutrino_path.c_str(), &buffer))
     {
-        nu_cache = new TFile(nufile);
+        std::cout << "Failed to open neutrino directory. \"" << neutrino_path << "\".\n";
+        return 1;
+    }
+    std::string neutrino_root = neutrino_path+"/neutrinos_detector.root";
+    bool neutrino_exists = (stat(neutrino_root.c_str(), &buffer) == 0);
+    
+    if(neutrino_exists)
+    {
+        nu_cache = new TFile(neutrino_root.c_str());
         nu_cache->GetObject("nuenergy", nu_energy);
     }
     else
     {
-        nu_cache = new TFile(nufile, "NEW");
+        nu_cache = new TFile(neutrino_root.c_str(), "NEW");
         nu_energy = new TH1D("nuenergy","nuenergy",20,0.3,2);
         iterateNeutrino((int)nu_detector_scale,
         [=](Particle&, double){},
         [=](Particle&, double, double, double){},
-        [=](Particle&, Particle& neutrino, Particle& electron, double weight){
+        [=](Particle&, Particle& neutrino, Particle& electron, double time, double weight){
             double E = electron.E;
             E += Random::Gauss(smear_mean, smear_sigma / std::sqrt(E));
             if(E>0){
@@ -681,11 +743,12 @@ void SensitivityAnalysis::Init(TFile* file, TBranch* branch) {
         nu_cache->Write();
     }
     
-	std::stringstream dmfile;
-	dmfile << "detector/DM_" << std::fixed << std::setprecision(6) << vpmass << "_" << chimass << "_" << kappa << "_" << alpha << ".root";
-	std::string sdmfile = dmfile.str();
+    std::stringstream dmfile;
+    dmfile << "detector/DM_" << std::fixed << std::setprecision(6) << vpmass << "_" << chimass << "_" << kappa << "_" << alpha << ".root";
+    std::string sdmfile = dmfile.str();
     if(stat(sdmfile.c_str(), &buffer) == 0)
     {
+        std::cout << "Loading Precached: " << sdmfile << std::endl;
         dm_cache = new TFile(sdmfile.c_str());
         dm_cache->GetObject("nth", dm_energy);
         dm_cache->GetObject("theta", theta_avg);
@@ -694,27 +757,30 @@ void SensitivityAnalysis::Init(TFile* file, TBranch* branch) {
     }
     else
     {
+        std::cout << "Processing: " << sdmfile << std::endl;
         dm_cache = new TFile(sdmfile.c_str(), "NEW");
         dm_energy = new TH1D("nth","nth",20,0.3,2);
-	    theta_avg = new TProfile("theta","theta",20,0.3,2);
-	    xsection = new TVectorD(1);
-	    xsection->operator()(0) = 0;
+        theta_avg = new TProfile("theta","theta",20,0.3,2);
+        xsection = new TVectorD(1);
+        xsection->operator()(0) = 0;
         loadedDM = false;
     }
+    
+    return 0;
 }
 
 int SensitivityAnalysis::Analyze(TFile* file, TBranch* branch) {
     if(loadedDM) return 0;
     TVectorD *v;
-	file->GetObject("xsection", v);
-	if(v)
-	    xsection->operator()(0) += v->operator()(0);
-	else
-		std::cout << "Root couldn't find crosssection object in file.\n";
-	
-	iterateDarkmatter((int)dm_detector_scale, branch, vpmass, chimass, kappa, alpha,
+    file->GetObject("xsection", v);
+    if(v)
+        xsection->operator()(0) += v->operator()(0);
+    else
+        std::cout << "Root couldn't find crosssection object in file.\n";
+    
+    iterateDarkmatter((int)dm_detector_scale, branch, vpmass, chimass, kappa, alpha,
     [=](Particle&, double, double){},
-    [=](Particle& darkmatter, Particle&, Particle& electron){
+    [=](Particle& darkmatter, Particle&, Particle& electron, double time){
         double E = electron.E;
         E += Random::Gauss(smear_mean, smear_sigma / std::sqrt(E));
         if(E>0){
@@ -733,9 +799,7 @@ void SensitivityAnalysis::UnInit() {
         xsection->Write();
         dm_cache->Write();
     }
-    double desired_pot = 6e20;
     double dm_pot = std::pow(files.size(),2)/(12*xsection->operator()(0)*1e-40*100*6.022140857e23);
-    double nu_pot = 25000000;
     
     dm_energy->Scale(desired_pot/dm_pot/dm_detector_scale);
     nu_energy->Scale(desired_pot/nu_pot);
@@ -785,7 +849,6 @@ int SensitivityScan::Process(const std::vector<std::string>& folders){
         stat(i->c_str(), &st);
         if(S_ISDIR(st.st_mode))
         {
-            std::cout << *i << std::endl;
             if(DMParameters(*i, vpmass, chimass, kappa, alpha)){
                 std::cout << "Couldn't read DM parameters!\n";
                 continue;
@@ -815,18 +878,6 @@ int SensitivityScan::Process(const std::vector<std::string>& folders){
         std::cout << "No sensitivities were scanned...\n";
         return 1;
     }
-    /*double minx = *std::min_element(masses.begin(), masses.end());
-    double maxx = *std::max_element(masses.begin(), masses.end());
-    double miny = *std::min_element(mixings.begin(), mixings.end());
-    double maxy = *std::max_element(mixings.begin(), mixings.end());
-    double xscale = maxx/minx/100.0;
-    double yscale = maxy/miny/100.0;
-    masses.push_back(minx/xscale);
-    masses.push_back(maxx*xscale);
-    mixings.push_back(miny/yscale);
-    mixings.push_back(maxy*yscale);
-    chisqr.push_back(0);
-    chisqr.push_back(0);*/
     
     std::stringstream sstitle1, sstitle2;
     sstitle1 << std::setprecision(6);
@@ -839,31 +890,49 @@ int SensitivityScan::Process(const std::vector<std::string>& folders){
     std::string title2 = sstitle2.str();
     
     TCanvas* canvas = new TCanvas("c1","canvas",1024,576);
-    canvas->SetLogx();
-    canvas->SetLogy();
+    //canvas->SetLogx();
+    //canvas->SetLogy();
     canvas->SetLogz();
     
     gStyle->SetPalette(55);
     //gStyle->SetNumberContours(100);
     
-    TGraph2D* graph2 = new TGraph2D(masses.size(),masses.data(),mixings.data(),chisqr.data());
-    graph2->SetNpx(500);
-    graph2->SetNpy(500);
+    TGraph2D* graph2 = new TGraph2D(masses.size());
+    for(int i = 0; i<masses.size(); ++i)
+    {
+        graph2->SetPoint(i, std::log10(masses[i]),std::log10(mixings[i]),chisqr[i]);
+    }
+    
+    double minx = graph2->GetXmin();
+    double maxx = graph2->GetXmax();
+    double miny = graph2->GetYmin();
+    double maxy = graph2->GetYmax();
+    TGaxis *xLogaxis = new TGaxis(minx, miny, maxx, miny, *std::min_element(masses.begin(), masses.end()), *std::max_element(masses.begin(), masses.end()), 510, "G");
+    TGaxis *yLogaxis = new TGaxis(minx, miny, minx, maxy, *std::min_element(mixings.begin(), mixings.end()), *std::max_element(mixings.begin(), mixings.end()), 510, "G");
+    //graph2->SetNpx(500);
+    //graph2->SetNpy(500);
     graph2->SetTitle(title2.c_str());
     
     //hist.Draw("");
     //graph2->Draw("col box scat");
     //graph2->Draw("SAME CONT1Z");
     graph2->Draw("CONT1Z");
+    xLogaxis->Draw();
+    yLogaxis->Draw();
     
     std::vector<TMarker*> markers;
     for(int i = 0; i<masses.size(); ++i)
     {
-        TMarker* m = new TMarker(masses[i], mixings[i], 0);
+        TMarker* m = new TMarker(std::log10(masses[i]), std::log10(mixings[i]), 0);
         m->SetMarkerStyle(7);
         m->Draw("");
         markers.push_back(m);
     }
+    graph2->GetHistogram()->GetXaxis()->SetLabelSize(0);
+    graph2->GetHistogram()->GetXaxis()->SetTickLength(0);
+    graph2->GetHistogram()->GetYaxis()->SetLabelSize(0);
+    graph2->GetHistogram()->GetYaxis()->SetTickLength(0);
+    graph2->GetHistogram()->GetYaxis()->SetTitleOffset(1);
     canvas->Update();
     canvas->SaveAs("SensitivityContours.png");
     
@@ -874,6 +943,8 @@ int SensitivityScan::Process(const std::vector<std::string>& folders){
     //graph2->Draw("col box scat");
     //graph2->Draw("SAME CONT1Z");
     graph2->Draw("CONT1Z");
+    xLogaxis->Draw();
+    yLogaxis->Draw();
     
     for(auto i = markers.begin(); i!=markers.end(); ++i)
         (*i)->Draw("SAME");
@@ -883,6 +954,8 @@ int SensitivityScan::Process(const std::vector<std::string>& folders){
     
     for(auto i = markers.begin(); i!=markers.end(); ++i)
         delete *i;
+    delete xLogaxis;
+    delete yLogaxis;
     delete graph2;
     //delete graph;
     delete canvas;

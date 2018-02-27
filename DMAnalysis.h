@@ -1,4 +1,5 @@
 #pragma once
+#include "cxxopts.hpp"
 #include <string>
 #include <vector>
 #include <TROOT.h>
@@ -6,6 +7,7 @@
 
 class TApplication;
 extern TApplication* gApp;
+extern cxxopts::Options options;
 
 class TFile;
 class TBranch;
@@ -26,7 +28,7 @@ public:
 protected:
 	double vpmass, chimass, kappa, alpha;
 	virtual int Analyze(TFile*, TBranch*) = 0;
-	virtual void Init(TFile*, TBranch*) = 0;
+	virtual int Init(TFile*, TBranch*) = 0;
 	virtual void UnInit() = 0;
 };
 
@@ -42,7 +44,7 @@ public:
 
 protected:
 	int Analyze(TFile*, TBranch*);
-	void Init(TFile*, TBranch*);
+	int Init(TFile*, TBranch*);
 	void UnInit();
 };
 
@@ -52,7 +54,7 @@ class DetectorAnalysis : public DMAnalysis
 	std::string detectorType;
 	double smear_sigma;
 	double smear_mean;
-	double dm_detector_scale;
+	double dm_detector_scale, nu_detector_scale;
 	double xsection;
     bool normalize_histos;
 public:
@@ -60,7 +62,7 @@ public:
 	~DetectorAnalysis();
 protected:
 	int Analyze(TFile*, TBranch*);
-	void Init(TFile*, TBranch*);
+	int Init(TFile*, TBranch*);
 	void UnInit();
 };
 
@@ -80,7 +82,7 @@ public:
 	~SensitivityAnalysis();
 protected:
 	int Analyze(TFile*, TBranch*);
-	void Init(TFile*, TBranch*);
+	int Init(TFile*, TBranch*);
 	void UnInit();
 };
 

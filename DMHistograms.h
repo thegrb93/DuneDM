@@ -8,7 +8,7 @@ class TH2D;
 class DMHistograms
 {
 public:
-    DMHistograms(std::string);
+    DMHistograms(std::string, TFile* dm, TFile* nu, bool nu_exists);
     ~DMHistograms();
 
     void AddProductionDM(TH1D* E, TH1D* Px, TH1D* Py, TH1D* Pz, TH1D* Th, TH1D* Phi);
@@ -17,11 +17,12 @@ public:
     void AddDetectorNu(double E, double Pz, double Pt, double Th, double W);
     void AddScatterDM(double E, double Pz, double Pt, double Th);
     void AddScatterNu(double E, double Pz, double Pt, double Th, double W);
-    void AddScatterSigElectron(double E, double Pz, double Pt, double Th);
-    void AddScatterBgElectron(double E, double Pz, double Pt, double Th, double W);
+    void AddScatterSigElectron(double E, double Pz, double Pt, double time, double Th);
+    void AddScatterBgElectron(double E, double Pz, double Pt, double Th, double time, double W);
     void ScaleDarkmatter(double scale, double detscale);
     void ScaleNeutrinos(double scale, double detscale);
     void NormalizeHistograms();
+    void SaveNeutrinos();
     void SaveHistograms();
 
     static std::string run_name;
@@ -33,7 +34,7 @@ public:
     //Input dark matter distributions
     TH1D *dmpx1, *dmpy1, *dmpz1, *dmpt1, *dme1, *dmthe1, *dmphi1, *dmx2, *dmy2, *dmpx2, *dmpy2, *dmpz2, *dmpt2, *dme2, *dmthe2, *dmphi2, *dmpz3, *dme3, *dmthe3;
     //Input neutrino distributions
-    TH1D *nupz1, *nupt1, *nue1, *nuthe1, *nupz2, *nupt2, *nue2, *nuthe2, *nupz3, *nupt3, *nue3, *nuthe3;
+    TH1D *nupz1, *nupt1, *nue1, *nuthe1, *nupz2, *nupt2, *nue2, *nuthe2, *nupz3, *nupt3, *nue3, *nuthe3, *nutime;
     //Signal-electron distributions
     TH1D *dm_epz1, *dm_ept1, *dm_ethe1, *dm_ee1, *dm_ee1smear, *dm_ee1smearr;
     //Background-electron distributions

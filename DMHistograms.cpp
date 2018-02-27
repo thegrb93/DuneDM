@@ -1,4 +1,5 @@
 #include "DMHistograms.h"
+#include "DMAnalysis.h"
 
 #include <TFile.h>
 #include <TH1D.h>
@@ -12,20 +13,20 @@
 
 std::string DMHistograms::run_name;
 
-DMHistograms::DMHistograms(std::string rname) {
+DMHistograms::DMHistograms(std::string rname, TFile* dm, TFile* nu, bool nu_exists) {
     run_name = rname;
-    mkdir("histograms", S_IRWXU | S_IRWXG | S_IRWXO);
-    mkdir("root", S_IRWXU | S_IRWXG | S_IRWXO);
-    mkdir(("histograms/"+rname).c_str(), S_IRWXU | S_IRWXG | S_IRWXO);
+    dm_output = dm;
+    nu_output = nu;
+    found_nu_output = nu_exists;
     
-    dm_output = new TFile(("root/"+rname+".root").c_str(), "RECREATE");
+    dm->cd();
 
     dmpx1 = new TH1D("dmpx1","#chi Production P_{x};P_{x} (GeV/c)", 100, -20, 20);
     dmpy1 = new TH1D("dmpy1","#chi Production P_{y};P_{y} (GeV/c)", 100, -20, 20);
     dmpz1 = new TH1D("dmpz1","#chi Production P_{z};P_{z} (GeV/c)", 100, 0, 60);
     //dmpt1 = new TH1D("dmpt1","#chi Production P_{t};P_{t} (GeV/c)", 100, 0, 0);
     dme1 = new TH1D("dme1","#chi Production Energy;E (GeV)", 100, 0, 60);
-    //dmtime = new TH1D("dmtime","#chi vs #nu  arrival time;Time (s)", 100, 0, 1e-9);
+    dmtime = new TH1D("dmtime","#chi arrival time;Time (s)", 100, 1.90965e-6, 1.90969e-6);
     dmthe1 = new TH1D("dmthe1","#chi Production #theta;#theta", 100, 0, M_PI);
     dmphi1 = new TH1D("dmphi1","#chi Production #phi;#phi", 100, -M_PI, M_PI);
     dmxy2 = new TH2D("dmxy2", "#chi in Detector x/y; x (m); y (m)", 80, -2, 2, 60, -1.5, 1.5);
@@ -43,17 +44,13 @@ DMHistograms::DMHistograms(std::string rname) {
     dmthe3 = new TH1D("dmthe3","#chi Scatter #theta;#theta", 100, 0, 0.006);
     dm_epz1 = new TH1D("dm_epz1","#chi + e^{-} Scatter P_{z};P_{z} (GeV/c)", 100, 0, 6);
     dm_ept1 = new TH1D("dm_ept1","#chi + e^{-} Scatter P_{t};P_{t} (GeV/c)", 100, 0, 6);
-    dm_ethe1 = new TH1D("dm_ethe1","#chi + e^{-} Scatter #theta;#theta", 100, 0, 3.2);
-    dm_ee1 = new TH1D("dm_ee1","#chi + e^{-} Scatter E;E (GeV)", 100, 0, 6);
-    dm_ee1smear = new TH1D("dm_ee1smear","#chi + e^{-} Smeared Scatter E;E (GeV)", 100, 0, 6);
-    dm_ee1smearr = new TH1D("dm_ee1smearr","#chi + e^{-} Scatter Energy Smearing Ratio;E (GeV)", 40, 0, 6);
+    dm_ethe1 = new TH1D("dm_ethe1","#chi + e^{-} Scatter #theta;#theta", 100, 0, 1.6);
+    dm_ee1 = new TH1D("dm_ee1","#chi + e^{-} Scatter E;E (GeV)", 100, 0, 15);
+    dm_ee1smear = new TH1D("dm_ee1smear","#chi + e^{-} Smeared Scatter E;E (GeV)", 100, 0, 15);
+    dm_ee1smearr = new TH1D("dm_ee1smearr","#chi + e^{-} Scatter Energy Smearing Ratio;E (GeV)", 40, 0, 15);
 
-    const char* nu_filen = "data/nu_output.root";
-    struct stat buffer;
-    if(stat(nu_filen, &buffer) == 0)
+    if(nu_exists)
     {
-        nu_output = new TFile(nu_filen, "READ");
-        found_nu_output = true;
         nu_output->GetObject("nupz1", nupz1);
         nu_output->GetObject("nupt1", nupt1);
         nu_output->GetObject("nue1", nue1);
@@ -66,6 +63,7 @@ DMHistograms::DMHistograms(std::string rname) {
         nu_output->GetObject("nupt3", nupt3);
         nu_output->GetObject("nue3", nue3);
         nu_output->GetObject("nuthe3", nuthe3);
+        nu_output->GetObject("nutime", nutime);
         nu_output->GetObject("nu_epz1", nu_epz1);
         nu_output->GetObject("nu_ept1", nu_ept1);
         nu_output->GetObject("nu_ethe1", nu_ethe1);
@@ -75,10 +73,8 @@ DMHistograms::DMHistograms(std::string rname) {
     }
     else
     {
+        nu->cd();
         std::cout << "Creating new nu_data!\n";
-        found_nu_output = false;
-        nu_output = new TFile(nu_filen, "RECREATE");
-        
         nupz1 = new TH1D("nupz1","#nu Production P_{z};P_{z} (GeV/c)", 100, 0, 60);
         nupt1 = new TH1D("nupt1","#nu Production P_{t};P_{t} (GeV/c)", 100, 0, 0);
         nue1 = new TH1D("nue1","#nu Production Energy;E (GeV)", 100, 0, 60);
@@ -91,12 +87,13 @@ DMHistograms::DMHistograms(std::string rname) {
         nupt3 = new TH1D("nupt3","#nu Scatter P_{t};P_{t} (GeV/c)", 100, 0, 0);
         nue3 = new TH1D("nue3","#nu Scatter E;E (GeV)", 100, 0, 0);
         nuthe3 = new TH1D("nuthe3","#nu in Detector #theta;#theta", 100, 0, 0);
+        nutime = new TH1D("nutime","#nu in Detector time;time", 100, 1.90965e-6, 1.90969e-6);
         nu_epz1 = new TH1D("nu_epz1","#nu + e^{-} Scatter P_{z};P_{z} (GeV/c)", 100, 0, 6);
         nu_ept1 = new TH1D("nu_ept1","#nu + e^{-} Scatter P_{z};P_{z} (GeV/c)", 100, 0, 6);
-        nu_ethe1 = new TH1D("nu_ethe1","#nu + e^{-} Scatter #theta;#theta", 100, 0, 3.2);
-        nu_ee1 = new TH1D("nu_ee1","#nu + e^{-} Scatter E;E (GeV)", 100, 0, 6);
-        nu_ee1smear = new TH1D("nu_ee1smear","#nu + e^{-} Smeared Scatter E;E (GeV)", 100, 0, 6);
-        nu_ee1smearr = new TH1D("nu_ee1smearr","#nu + e^{-} Scatter Energy Smearing Ratio;E (GeV)", 40, 0, 6);
+        nu_ethe1 = new TH1D("nu_ethe1","#nu + e^{-} Scatter #theta;#theta", 100, 0, 1.6);
+        nu_ee1 = new TH1D("nu_ee1","#nu + e^{-} Scatter E;E (GeV)", 100, 0, 15);
+        nu_ee1smear = new TH1D("nu_ee1smear","#nu + e^{-} Smeared Scatter E;E (GeV)", 100, 0, 15);
+        nu_ee1smearr = new TH1D("nu_ee1smearr","#nu + e^{-} Scatter Energy Smearing Ratio;E (GeV)", 40, 0, 15);
     }
 
     /*
@@ -169,6 +166,7 @@ DMHistograms::~DMHistograms() {
     delete nupt3;
     delete nue3;
     delete nuthe3;
+    delete nutime;
     delete nu_epz1;
     delete nu_ept1;
     delete nu_ethe1;
@@ -255,7 +253,7 @@ void DMHistograms::NormalizeHistograms() {
     normalizeHisto(dmpz1);
     //normalizeHisto(dmpt1);
     normalizeHisto(dme1);
-    //normalizeHisto(dmtime);
+    normalizeHisto(dmtime);
     normalizeHisto(dmthe1);
     normalizeHisto(dmphi1);
     normalizeHisto(dmxy2);
@@ -279,6 +277,7 @@ void DMHistograms::NormalizeHistograms() {
 
     normalizeHisto(nupz1);
     normalizeHisto(nue1);
+    normalizeHisto(nutime);
     normalizeHisto(nupz2);
     normalizeHisto(nue2);
     normalizeHisto(nuthe1);
@@ -297,6 +296,10 @@ void DMHistograms::NormalizeHistograms() {
     normalizeHisto(nuebar_e);
     normalizeHisto(numu_e);
     normalizeHisto(numubar_e);*/
+}
+
+void DMHistograms::SaveNeutrinos() {
+    nu_output->Write();
 }
 
 void DMHistograms::SaveHistograms() {
@@ -340,6 +343,7 @@ void DMHistograms::SaveHistograms() {
     nupt3->BufferEmpty();
     nue3->BufferEmpty();
     nuthe3->BufferEmpty();
+    nutime->BufferEmpty();
     nu_epz1->BufferEmpty();
     nu_ept1->BufferEmpty();
     nu_ethe1->BufferEmpty();
@@ -355,10 +359,6 @@ void DMHistograms::SaveHistograms() {
 
     std::cout << "Writing DM RootFile.\n";
     dm_output->Write();
-    if(!found_nu_output){
-        std::cout << "Writing NU RootFile.\n";
-        nu_output->Write();
-    }
 
     TCanvas* canvas = new TCanvas("c1","canvas",1024,576);
 
@@ -367,7 +367,7 @@ void DMHistograms::SaveHistograms() {
     saveHistogram(canvas, dmpz1);
     //saveHistogram(canvas, dmpt1);
     saveHistogram(canvas, dme1);
-    //saveHistogram(canvas, dmtime);
+    saveHistogram(canvas, dmtime);
     saveHistogram(canvas, dmthe1);
     saveHistogram(canvas, dmphi1);
     saveHistogram(canvas, dmx2);
@@ -387,6 +387,7 @@ void DMHistograms::SaveHistograms() {
     saveHistogram(canvas, nupz1);
     saveHistogram(canvas, nupt1);
     saveHistogram(canvas, nue1);
+    saveHistogram(canvas, nutime);
     saveHistogram(canvas, nuthe1);
     
     saveHistogram(canvas, nupz2);
@@ -444,6 +445,7 @@ void DMHistograms::SaveHistograms() {
     saveComparison(canvas, "nu_dm_ept", "DM vs Neutrino Electron Scatter P_{t};P_{t} (GeV/c)", dm_ept1, nu_ept1, "Electron - Dark matter P_{t}", "Electron - Neutrino P_{t}");
     saveComparison(canvas, "nu_dm_ee", "DM vs Neutrino Electron Scatter E;E (GeV)", dm_ee1, nu_ee1, "Electron - Dark matter E", "Electron - Neutrino E");
     saveComparison(canvas, "nu_dm_etheta", "DM vs Neutrino Electron Scatter #theta;#theta (rad)", dm_ethe1, nu_ethe1, "Electron - Dark matter #theta", "Electron - Neutrino #theta");
+    saveComparison(canvas, "nu_dm_time", "DM vs Neutrino Electron Time;Time", dmtime, nutime, "Electron - Dark matter Time", "Electron - Neutrino Time");
 
     delete canvas;
 }
@@ -456,7 +458,6 @@ void DMHistograms::ScaleDarkmatter(double scale, double detscale) {
     dme1->Scale(scale);
     dmthe1->Scale(scale);
     dmphi1->Scale(scale);
-    //dmtime->Scale(scale);
     dmx2->Scale(scale);
     dmy2->Scale(scale);
     dmxy2->Scale(scale);
@@ -475,6 +476,7 @@ void DMHistograms::ScaleDarkmatter(double scale, double detscale) {
     dm_epz1->Scale(detscale);
     dm_ept1->Scale(detscale);
     dm_ethe1->Scale(detscale);
+    dmtime->Scale(detscale);
 }
 
 void DMHistograms::ScaleNeutrinos(double scale, double detscale) {
@@ -494,6 +496,7 @@ void DMHistograms::ScaleNeutrinos(double scale, double detscale) {
     nu_ept1->Scale(detscale);
     nu_ee1->Scale(detscale);
     nu_ethe1->Scale(detscale);
+    nutime->Scale(detscale);
 }
 
 void DMHistograms::AddProductionDM(TH1D* E, TH1D* Px, TH1D* Py, TH1D* Pz, TH1D* Th, TH1D* Phi) {
@@ -527,12 +530,12 @@ void DMHistograms::AddScatterDM(double E, double Pz, double Pt, double Th) {
         dme3smear->Fill(darkmatter1.E);
     }*/
 }
-void DMHistograms::AddScatterSigElectron(double E, double Pz, double Pt, double Th) {
+void DMHistograms::AddScatterSigElectron(double E, double Pz, double Pt, double Th, double time) {
     dm_ee1->Fill(E);
     dm_epz1->Fill(Pz);
     dm_ept1->Fill(Pt);
     dm_ethe1->Fill(Th);
-
+    dmtime->Fill(time);
     /*if (smear_sigma > 0) {
         double Es += Random::Gauss(smear_mean, smear_sigma / sqrt(E));
         dm_ee1smear->Fill(Es);
@@ -583,12 +586,12 @@ void DMHistograms::AddScatterNu(double E, double Pz, double Pt, double Th, doubl
         dm_ee1smearr->Fill(electron1.E / electron1E);
     }*/
 }
-void DMHistograms::AddScatterBgElectron(double E, double Pz, double Pt, double Th, double W) {
+void DMHistograms::AddScatterBgElectron(double E, double Pz, double Pt, double Th, double time, double W) {
     nu_ee1->Fill(E, W);
     nu_epz1->Fill(Pz, W);
     nu_ept1->Fill(Pt, W);
     nu_ethe1->Fill(Th, W);
-
+    nutime->Fill(time, W);
     /*if (smear_sigma > 0) {
         E += Random::Gauss(smear_mean, smear_sigma / sqrt(E));
 
