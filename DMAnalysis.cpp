@@ -686,8 +686,8 @@ void DetectorAnalysis::UnInit() {
             hists->NormalizeHistograms();
         }
         else{
-            if(xsection!=0){
-                double dm_pot = std::pow(totalevents,2)/(xsection*1e-36*12*100*6.022140857e23);
+            if(xsection!=0){                
+                double dm_pot = totalevents*(double)files.size()/(xsection*1e-36*12*100*6.022140857e23);
                 double dm_scale = desired_pot/dm_pot;
                 std::cout << "DM Scale: " << dm_scale << std::endl;
                 hists->ScaleDarkmatter(dm_scale, dm_scale/dm_detector_scale);
