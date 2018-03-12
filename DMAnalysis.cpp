@@ -38,7 +38,7 @@
 #include "Random.h"
 
 const double emass = 0.000511;
-double desired_pot = 1.47e21 * 3.5; //80GeV POT, 3.5 years
+double desired_pot = 1.47e21 * 3.5 * 0.5; //80GeV POT, 3.5 years, 50% Duty factor
 //double desired_pot = 1.1e21; //120GeV
 double nu_pot = 25000000;
 
@@ -83,7 +83,7 @@ int DMParameters(const std::string& filen, double& vpmass, double& chimass, doub
         if(parser.bad()) goto error;*/
         return 0;
     }
-    
+
     error:;
     std::cout << "Tried to parse invalid filename: " << filen << std::endl;
     return 1;
@@ -296,7 +296,7 @@ void iterateNeutrino(int detector_scale,
             double energy, weight;
             calculateNeutrinoNearDetector(ptype, Ntype, ppenergy, ppdxdz, ppdydz, pppz, Necm, pdPx, pdPy, pdPz, Vx, Vy, Vz, mupare, muparpx, muparpy, muparpz, Nimpwt, energy, p_nu, weight);
             neutrino.FourMomentum(p_nu[0], p_nu[1], p_nu[2], energy);
-            
+
             //double weight = Nimpwt * NWtNear[0];
             //neutrino.FourMomentum(ndxdz*ndz, ndydz*ndz, ndz, NenergyN[0]);
             neutrino.calcOptionalKinematics();
@@ -361,7 +361,7 @@ void iterateDarkmatter(int detitr, TBranch* branch, double vpmass, double chimas
             std::cout << ((TRootLHEFParticle*)array->At(2))->PID << std::endl;
             std::cout << ((TRootLHEFParticle*)array->At(3))->PID << std::endl;
             std::cout << ((TRootLHEFParticle*)array->At(4))->PID << std::endl;*/
-            
+
             double tmin, tmax;
             darkmatter.FourMomentum(lhefdarkmatter->Px,lhefdarkmatter->Py,-lhefdarkmatter->Pz,lhefdarkmatter->E);
             darkmatter.calcOptionalKinematics();
@@ -398,21 +398,21 @@ int DMAnalysis::Process(std::string folder) {
         UnInit();
         return 1;
     }
-    
+
     getFolderFiles(folder, files);
     if(files.size()==0) {
         std::cout << "Didn't find any root files.\n";
         UnInit();
         return 1;
     }
-    
+
     std::cout << std::endl;
     bool first = true;
     for(int i = 0; i<files.size(); ++i) {
         TFile file(files[i].c_str());
         TTree* tree;
         TBranch* branch;
-        
+
         if(!file.IsOpen()) {
             std::cout << "Failed to open file: " << file.GetName() << std::endl;
             continue;
@@ -438,7 +438,7 @@ int DMAnalysis::Process(std::string folder) {
         std::cout << "\r(" << (i+1) << " / " << files.size() << ") completed..." << std::flush;
     }
     std::cout << std::endl;
-    
+
     UnInit();
     return 0;
 }
@@ -470,13 +470,13 @@ int StatisticsAnalysis::Init(TFile*, TBranch*){
     graphbg = new TGraph2D((int)files.size());
     graphbg->SetName("bg");
     graphbg->SetTitle("Background;VP mass(GeV);#chi mass(GeV);Counts");
-    
+
     graphdmee = new TGraph2D((int)files.size());
     graphdmee->SetName("dmee");
     graphdmee->SetTitle("Electron Scatter E against dm Mean;VP mass(GeV);#chi mass(GeV);E(GeV)");
 
     neutrino_electron_e = new TH1D("nuee3","Nu-Electron Scatter E;E (GeV)", 100, 0, 6);
-    
+
     iterateNeutrino(1,
     [=](Particle& neutrino, double weight){
     //nupz1->Fill(neutrino.pz, weight);
@@ -496,20 +496,20 @@ int StatisticsAnalysis::Init(TFile*, TBranch*){
         //double pnorm = sqrt(electron.px*electron.px+electron.py*electron.py+electron.pz*electron.pz);
         //nu_ethe1->Fill(acos(std::min<double>(std::max<double>(electron.pz/pnorm, -1), 1));
     });
-    
+
     return 0;
 }
 
 int StatisticsAnalysis::Analyze(TFile* file, TBranch* branch){
     TH1D* dm_electron_e = new TH1D("dme","DM-Electron Scatter E;E (GeV)", 100, 0, 6);
-    
+
     iterateDarkmatter(1, branch, vpmass, chimass, kappa, alpha,
     [=](Particle& darkmatter, double tmin, double tmax){
     },
     [=](Particle&, Particle&, Particle& electron, double time){
         dm_electron_e->Fill(electron.E);
     });
-    
+
     double chi2 = 0;
     for(int i = 1; i<=dm_electron_e->GetNbinsX(); ++i)
     {
@@ -523,7 +523,7 @@ int StatisticsAnalysis::Analyze(TFile* file, TBranch* branch){
     graphchi2->SetPoint(index, vpmass, chimass, chi2);
     graphdmee->SetPoint(index, vpmass, chimass, dm_electron_e->GetMean(1));
     ++index;
-    
+
     delete dm_electron_e;
     return 0;
 }
@@ -537,7 +537,7 @@ void StatisticsAnalysis::UnInit(){
     canvas->SetFillColor(33);
     canvas->SetFrameFillColor(17);
     canvas->SetGrid();
-    
+
     canvas->SetTheta(-90);
     canvas->SetPhi(-0.0001);
 
@@ -552,7 +552,7 @@ void StatisticsAnalysis::UnInit(){
     graphdmee->Draw("surf1 Z");
     canvas->Update();
     canvas->SaveAs("dme.png");
-    
+
     neutrino_electron_e->Draw();
     canvas->Update();
     canvas->SaveAs("nue.png");
@@ -593,18 +593,18 @@ int DetectorAnalysis::Init(TFile* file, TBranch* branch) {
         smear_sigma = toDouble(gOptions[OPT_DET_SMEAR_SIG].last()->arg);
     else
         smear_sigma = 0;
-    
+
     if(gOptions[OPT_DET_SMEAR_MEAN])
         smear_mean = toDouble(gOptions[OPT_DET_SMEAR_MEAN].last()->arg);
     else
         smear_mean = 0;*/
     smear_mean = 0;
     smear_sigma = 0.06;
-    
+
     std::stringstream ssrunname;
     ssrunname << std::fixed << std::setprecision(6) << "DM_" << vpmass << "_" << chimass << "_" << kappa << "_" << alpha;
     std::string runname = ssrunname.str();
-    
+
     std::string neutrino_path = options["neutrinos"].as<std::string>();
     struct stat buffer;
     if(stat(neutrino_path.c_str(), &buffer))
@@ -614,7 +614,7 @@ int DetectorAnalysis::Init(TFile* file, TBranch* branch) {
     }
     std::string neutrino_root = neutrino_path+"/neutrinos.root";
     bool neutrino_exists = (stat(neutrino_root.c_str(), &buffer) == 0);
-    
+
     mkdir("histograms", S_IRWXU | S_IRWXG | S_IRWXO);
     mkdir("root", S_IRWXU | S_IRWXG | S_IRWXO);
     mkdir(("histograms/"+runname).c_str(), S_IRWXU | S_IRWXG | S_IRWXO);
@@ -625,9 +625,9 @@ int DetectorAnalysis::Init(TFile* file, TBranch* branch) {
         nu_output = new TFile(neutrino_root.c_str(), "READ");
     else
         nu_output = new TFile(neutrino_root.c_str(), "CREATE");
-    
+
     hists = new DMHistograms(runname, dm_output, nu_output, neutrino_exists);
-    
+
     if(!neutrino_exists){
         iterateNeutrino((int)nu_detector_scale,
         [=](Particle& neutrino, double weight){
@@ -642,11 +642,11 @@ int DetectorAnalysis::Init(TFile* file, TBranch* branch) {
         });
         hists->SaveNeutrinos();
     }
-    
+
     return 0;
 }
 
-int DetectorAnalysis::Analyze(TFile* file, TBranch* branch) {    
+int DetectorAnalysis::Analyze(TFile* file, TBranch* branch) {
     {
         TVectorD *v;
         TH1D* E, *Px, *Py, *Pz, *Th, *Phi;
@@ -661,7 +661,7 @@ int DetectorAnalysis::Analyze(TFile* file, TBranch* branch) {
 
         file->GetObject("xsection", v);
         if(v){
-            xsection += v->operator()(0);
+            xsection += v->operator()(0) / (double)files.size(); //Divide by # of files to average
             totalevents += E->GetEntries() / 2.0; //Divide by two because anti-darkmatter is included and we want # of events
         }
         else
@@ -686,8 +686,8 @@ void DetectorAnalysis::UnInit() {
             hists->NormalizeHistograms();
         }
         else{
-            if(xsection!=0){                
-                double dm_pot = totalevents*(double)files.size()/(xsection*1e-36*12*100*6.022140857e23);
+            if(xsection!=0){
+                double dm_pot = totalevents/(xsection*1e-36*12*100*6.022140857e23);
                 double dm_scale = desired_pot/dm_pot;
                 std::cout << "DM Scale: " << dm_scale << std::endl;
                 hists->ScaleDarkmatter(dm_scale, dm_scale/dm_detector_scale);
@@ -705,7 +705,7 @@ void DetectorAnalysis::UnInit() {
 ////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////
 
-SensitivityAnalysis::SensitivityAnalysis(){ 
+SensitivityAnalysis::SensitivityAnalysis(){
     smear_mean = 0;
     smear_sigma = 0.06;
     chisqr = 0;
@@ -723,7 +723,7 @@ SensitivityAnalysis::~SensitivityAnalysis(){
 
 int SensitivityAnalysis::Init(TFile* file, TBranch* branch) {
     mkdir("detector", S_IRWXU | S_IRWXG | S_IRWXO);
-    
+
     std::string neutrino_path = options["neutrinos"].as<std::string>();
     struct stat buffer;
     if(stat(neutrino_path.c_str(), &buffer))
@@ -733,7 +733,7 @@ int SensitivityAnalysis::Init(TFile* file, TBranch* branch) {
     }
     std::string neutrino_root = neutrino_path+"/neutrinos_detector.root";
     bool neutrino_exists = (stat(neutrino_root.c_str(), &buffer) == 0);
-    
+
     if(neutrino_exists)
     {
         nu_cache = new TFile(neutrino_root.c_str());
@@ -756,7 +756,7 @@ int SensitivityAnalysis::Init(TFile* file, TBranch* branch) {
         nu_energy->Scale(1/nu_detector_scale);
         nu_cache->Write();
     }
-    
+
     std::stringstream dmfile;
     dmfile << "detector/DM_" << std::fixed << std::setprecision(6) << vpmass << "_" << chimass << "_" << kappa << "_" << alpha << ".root";
     std::string sdmfile = dmfile.str();
@@ -780,7 +780,7 @@ int SensitivityAnalysis::Init(TFile* file, TBranch* branch) {
         xsection->operator()(1) = 0;
         loadedDM = false;
     }
-    
+
     return 0;
 }
 
@@ -791,12 +791,12 @@ int SensitivityAnalysis::Analyze(TFile* file, TBranch* branch) {
     file->GetObject("energies", E);
     file->GetObject("xsection", v);
     if(v){
-        xsection->operator()(0) += v->operator()(0);
+        xsection->operator()(0) += v->operator()(0) / (double)files.size(); //Divide by # of files to average
         xsection->operator()(1) += E->GetEntries() / 2.0; //Divide by two because anti-darkmatter is included and we want # of events
     }
     else
         std::cout << "Root couldn't find crosssection object in file.\n";
-    
+
     iterateDarkmatter((int)dm_detector_scale, branch, vpmass, chimass, kappa, alpha,
     [=](Particle&, double, double){},
     [=](Particle& darkmatter, Particle&, Particle& electron, double time){
@@ -807,15 +807,13 @@ int SensitivityAnalysis::Analyze(TFile* file, TBranch* branch) {
             theta_avg->Fill(E, electron.theta);
         }
     });
-    
+
     return 0;
 }
 
 void SensitivityAnalysis::UnInit() {
     if(!loadedDM)
     {
-        xsection->operator()(0) /= (double)files.size();
-        
         dm_cache->cd();
         xsection->Write();
         dm_cache->Write();
@@ -823,12 +821,12 @@ void SensitivityAnalysis::UnInit() {
     double sigma = xsection->operator()(0);
     double Nx = xsection->operator()(1);
     double dm_pot = Nx/(sigma*1e-36*100*12*6.022140857e23);
-    
+
     dm_energy->Scale(desired_pot/dm_pot/dm_detector_scale);
     nu_energy->Scale(desired_pot/nu_pot);
 
     int nbins = dm_energy->GetSize()-1;
-    
+
     //int binstart = 1, binend = nbins;
     for(int binstart = 1; binstart < nbins; ++binstart){
         for(int binend = binstart+1; binend<=nbins; ++binend){
@@ -846,9 +844,9 @@ void SensitivityAnalysis::UnInit() {
             }
         }
     }
-    
+
     std::cout << std::scientific << "Chisqr is " << chisqr << ". Cut from " << std::fixed << binstart_max << "(GeV) to " << binend_max << "(GeV)" << std::endl;
-    
+
     delete xsection;
     delete dm_energy;
     delete nu_energy;
@@ -861,10 +859,10 @@ SensitivityScan::SensitivityScan() {
 }
 
 int SensitivityScan::Process(const std::vector<std::string>& folders){
-    std::vector<double> masses, mixings, chisqr;
+    std::vector<double> masses, kappas, mixings, sigmas, chisqr;
     double vpmass, chimass, alpha, kappa;
     std::ofstream sensitivity_output("sensitivity.txt");
-    
+
     for(auto i = folders.begin(); i!=folders.end(); ++i){
         struct stat st;
         stat(i->c_str(), &st);
@@ -884,91 +882,167 @@ int SensitivityScan::Process(const std::vector<std::string>& folders){
                 std::cout << "Calculated a nan chisqr!\n";
                 continue;
             }
+            masses.push_back(chimass);
+            kappas.push_back(kappa);
+            chisqr.push_back(analysis.chisqr);
+
             double mixing = std::pow(kappa,2)*alpha*std::pow(chimass/vpmass,4);
             mixings.push_back(mixing);
-            chisqr.push_back(analysis.chisqr);
-            masses.push_back(chimass);
+            //double sigma = ??;
+            //sigmas.push_back(sigma);
+
             sensitivity_output << vpmass << "," << chimass << "," << kappa << "," << alpha << "," << mixing << "," << analysis.chisqr << "," << analysis.binstart_max << "," << analysis.binend_max << std::endl;
         }
     }
-    
+
     if(mixings.size()==0){
         std::cout << "No sensitivities were scanned...\n";
         return 1;
     }
-    
+
     std::stringstream sstitle;
-    
+
     sstitle << std::setprecision(6);
     sstitle << "Sensitivity #alpha=" << alpha << ";m_{#Chi} (GeV);y=#epsilon^{2}#alpha(m_{#Chi}/m_{A'})^{4}";
-    
+
     std::string title = sstitle.str();
-    
+
     std::vector<TMarker*> markers;
     TCanvas* canvas = new TCanvas("c1","canvas",1024,576);
     //canvas->SetLogx();
     //canvas->SetLogy();
     canvas->SetLogz();
-    
+
     gStyle->SetPalette(55);
     //gStyle->SetNumberContours(100);
-    
+
+    TGraph2D* graph1 = new TGraph2D(masses.size());
+    graph1->SetName("graph1");
     TGraph2D* graph2 = new TGraph2D(masses.size());
+    graph2->SetName("graph2");
     graph2->SetTitle(title.c_str());
-    graph2->GetHistogram()->GetXaxis()->SetLabelSize(0);
-    graph2->GetHistogram()->GetXaxis()->SetTickLength(0);
-    graph2->GetHistogram()->GetYaxis()->SetLabelSize(0);
-    graph2->GetHistogram()->GetYaxis()->SetTickLength(0);
-    
+
     for(int i = 0; i<masses.size(); ++i)
     {
-        double mass = std::log10(masses[i]), mixing = std::log10(mixings[i]);
+        double mass = std::log10(masses[i]), kappa = std::log10(kappas[i]), mixing = std::log10(mixings[i]);
+        graph1->SetPoint(i, mass, kappa, chisqr[i]);
         graph2->SetPoint(i, mass, mixing, chisqr[i]);
-        
+
         TMarker* m = new TMarker(mass, mixing, 0);
         m->SetMarkerStyle(7);
         markers.push_back(m);
     }
-    
-    double minx = graph2->GetXmin();
-    double maxx = graph2->GetXmax();
-    double miny = graph2->GetYmin();
-    double maxy = graph2->GetYmax();
-    TGaxis *xLogaxis = new TGaxis(minx, miny, maxx, miny, *std::min_element(masses.begin(), masses.end()), *std::max_element(masses.begin(), masses.end()), 510, "G");
-    TGaxis *yLogaxis = new TGaxis(minx, miny, minx, maxy, *std::min_element(mixings.begin(), mixings.end()), *std::max_element(mixings.begin(), mixings.end()), 510, "G");
+
+    TGaxis* xLogaxis;
+    TGaxis* yLogaxis;
+    {
+        double minx = graph2->GetXmin();
+        double maxx = graph2->GetXmax();
+        double miny = graph2->GetYmin();
+        double maxy = graph2->GetYmax();
+        xLogaxis = new TGaxis(minx, miny, maxx, miny, *std::min_element(masses.begin(), masses.end()), *std::max_element(masses.begin(), masses.end()), 510, "G");
+        yLogaxis = new TGaxis(minx, miny, minx, maxy, *std::min_element(mixings.begin(), mixings.end()), *std::max_element(mixings.begin(), mixings.end()), 510, "G");
+    }
     //graph2->SetNpx(500);
     //graph2->SetNpy(500);
-    
+
     //graph2->Draw("col box scat");
     //graph2->Draw("SAME CONT1Z");
+
+    graph1->Draw("CONT1Z");
+    {
+        std::ofstream curve("curve.txt");
+        TList* list = graph2->GetContourList(0.9);
+        if(!list) std::cout << "Contour list is NULL!" << std::endl;
+        TIter next(list);
+        TGraph* obj;
+        while(obj = (TGraph*)next()){
+            bool waslast = false;
+            double lastx, lasty;
+            for(int i = 0; i<obj->GetN(); ++i){
+                double x, y;
+                obj->GetPoint(i, x, y);
+                if(waslast){
+                    const double spacing = 0.05;
+
+                    double dirx = x - lastx, diry = y - lasty;
+                    double length = std::sqrt(dirx*dirx + diry*diry);
+
+                    int count = (int)(length / spacing);
+                    double newspacex = dirx / count;
+                    double newspacey = diry / count;
+                    double normx = dirx / length;
+                    double normy = diry / length;
+
+                    for(int o = 0; o<count; ++o)
+                    {
+                        double newx = lastx + newspacex*o;
+                        double newy = lasty + newspacey*o;
+                        double perpx1 = newx - normy*spacing;
+                        double perpy1 = newy + normx*spacing;
+                        double perpx2 = newx + normy*spacing;
+                        double perpy2 = newy - normx*spacing;
+
+                        TMarker* m;
+                        m = new TMarker(newx, newy, 0);
+                        m->SetMarkerStyle(7);
+                        markers.push_back(m);
+
+                        m = new TMarker(perpx1, perpy1, 0);
+                        m->SetMarkerStyle(7);
+                        markers.push_back(m);
+
+                        m = new TMarker(perpx2, perpy2, 0);
+                        m->SetMarkerStyle(7);
+                        markers.push_back(m);
+
+                        curve << std::pow(10, newx) << " " << std::pow(10, newy) << std::endl;
+                        curve << std::pow(10, perpx1) << " " << std::pow(10, perpy1) << std::endl;
+                        curve << std::pow(10, perpx2) << " " << std::pow(10, perpy2) << std::endl;
+                    }
+                }
+                else
+                    waslast = true;
+                lastx = x; lasty = y;
+            }
+        }
+    }
+
     graph2->Draw("CONT1Z");
     xLogaxis->Draw();
     yLogaxis->Draw();
-    
+
     for(auto i = markers.begin(); i!=markers.end(); ++i)
         (*i)->Draw();
-    
+
+    graph2->GetHistogram()->GetXaxis()->SetLabelSize(0);
+    graph2->GetHistogram()->GetXaxis()->SetTickLength(0);
+    graph2->GetHistogram()->GetYaxis()->SetLabelSize(0);
+    graph2->GetHistogram()->GetYaxis()->SetTickLength(0);
+
     canvas->Update();
     canvas->SaveAs("SensitivityContours.png");
-    
+
     double level = 0.9;
     graph2->GetHistogram()->SetContour(1, &level);
-    
+
     //graph2->Draw("col box scat");
     //graph2->Draw("SAME CONT1Z");
+
     graph2->Draw("CONT1Z");
     xLogaxis->Draw();
     yLogaxis->Draw();
-    
+
     for(auto i = markers.begin(); i!=markers.end(); ++i)
         (*i)->Draw();
-    
+
     graph2->GetHistogram()->GetZaxis()->SetLabelOffset(999);
     graph2->GetHistogram()->GetZaxis()->SetLabelSize(0);
     graph2->GetHistogram()->GetZaxis()->SetTickLength(0);
+
     canvas->Update();
     canvas->SaveAs("Sensitivity90.png");
-    
+
     for(auto i = markers.begin(); i!=markers.end(); ++i)
         delete *i;
     delete xLogaxis;
