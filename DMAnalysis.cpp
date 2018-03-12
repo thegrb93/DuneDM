@@ -38,7 +38,7 @@
 #include "Random.h"
 
 const double emass = 0.000511;
-double desired_pot = 1.47e21; //80GeV
+double desired_pot = 1.47e21 * 3.5; //80GeV POT, 3.5 years
 //double desired_pot = 1.1e21; //120GeV
 double nu_pot = 25000000;
 
@@ -406,9 +406,10 @@ int DMAnalysis::Process(std::string folder) {
         return 1;
     }
     
+    std::cout << std::endl;
     bool first = true;
-    for(auto fname = files.begin(); fname!=files.end(); ++fname) {
-        TFile file(fname->c_str());
+    for(int i = 0; i<files.size(); ++i) {
+        TFile file(files[i].c_str());
         TTree* tree;
         TBranch* branch;
         
@@ -434,7 +435,9 @@ int DMAnalysis::Process(std::string folder) {
         }
         if(Analyze(&file, branch))
             continue;
+        std::cout << "\r(" << (i+1) << " / " << files.size() << ") completed..." << std::flush;
     }
+    std::cout << std::endl;
     
     UnInit();
     return 0;
@@ -567,6 +570,7 @@ DetectorAnalysis::DetectorAnalysis(){
     dm_detector_scale = 100;
     nu_detector_scale = 1000;
     xsection = 0;
+    totalevents = 0;
 }
 
 DetectorAnalysis::~DetectorAnalysis(){
@@ -642,15 +646,9 @@ int DetectorAnalysis::Init(TFile* file, TBranch* branch) {
     return 0;
 }
 
-int DetectorAnalysis::Analyze(TFile* file, TBranch* branch) {
-    TVectorD *v;
-    file->GetObject("xsection", v);
-    if(v)
-        xsection += v->operator()(0);
-    else
-        std::cout << "Root couldn't find crosssection object in file.\n";
-    
+int DetectorAnalysis::Analyze(TFile* file, TBranch* branch) {    
     {
+        TVectorD *v;
         TH1D* E, *Px, *Py, *Pz, *Th, *Phi;
         file->GetObject("energies", E);
         file->GetObject("xmomentum", Px);
@@ -659,6 +657,15 @@ int DetectorAnalysis::Analyze(TFile* file, TBranch* branch) {
         file->GetObject("theta", Th);
         file->GetObject("phi", Phi);
         if(E) hists->AddProductionDM(E, Px, Py, Pz, Th, Phi);
+        else std::cout << "Root couldn't find histogram objects in file.\n";
+
+        file->GetObject("xsection", v);
+        if(v){
+            xsection += v->operator()(0);
+            totalevents += E->GetEntries() / 2.0; //Divide by two because anti-darkmatter is included and we want # of events
+        }
+        else
+            std::cout << "Root couldn't find crosssection object in file.\n";
     }
 
     iterateDarkmatter((int)dm_detector_scale, branch, vpmass, chimass, kappa, alpha,
@@ -673,19 +680,23 @@ int DetectorAnalysis::Analyze(TFile* file, TBranch* branch) {
 }
 
 void DetectorAnalysis::UnInit() {
-    if(normalize_histos){
-        hists->NormalizeHistograms();
-    }
-    else{
-        if(xsection!=0){
-            double dm_pot = std::pow(files.size(),2)/(12*xsection*1e-40*100*6.022140857e23);
-            double dm_scale = desired_pot/dm_pot;
-            hists->ScaleDarkmatter(dm_scale, dm_scale/dm_detector_scale);
+    if(totalevents!=0)
+    {
+        if(normalize_histos){
+            hists->NormalizeHistograms();
         }
-        double nu_scale = desired_pot/nu_pot;
-        hists->ScaleNeutrinos(nu_scale, nu_scale/nu_detector_scale);
+        else{
+            if(xsection!=0){
+                double dm_pot = std::pow(totalevents,2)/(xsection*1e-36*12*100*6.022140857e23);
+                double dm_scale = desired_pot/dm_pot;
+                std::cout << "DM Scale: " << dm_scale << std::endl;
+                hists->ScaleDarkmatter(dm_scale, dm_scale/dm_detector_scale);
+            }
+            double nu_scale = desired_pot/nu_pot;
+            hists->ScaleNeutrinos(nu_scale, nu_scale/nu_detector_scale);
+        }
+        hists->SaveHistograms();
     }
-    hists->SaveHistograms();
 
     delete hists;
 }
@@ -701,6 +712,9 @@ SensitivityAnalysis::SensitivityAnalysis(){
     xsection = 0;
     dm_detector_scale = 100;
     nu_detector_scale = 1000;
+    detector_efficiency = 0.9;
+    binstart_max = 0;
+    binend_max = 0;
     loadedDM = false;
 }
 
@@ -757,12 +771,13 @@ int SensitivityAnalysis::Init(TFile* file, TBranch* branch) {
     }
     else
     {
-        std::cout << "Processing: " << sdmfile << std::endl;
+        std::cout << "Creating: " << sdmfile << std::endl;
         dm_cache = new TFile(sdmfile.c_str(), "NEW");
         dm_energy = new TH1D("nth","nth",20,0.3,2);
         theta_avg = new TProfile("theta","theta",20,0.3,2);
-        xsection = new TVectorD(1);
+        xsection = new TVectorD(2);
         xsection->operator()(0) = 0;
+        xsection->operator()(1) = 0;
         loadedDM = false;
     }
     
@@ -772,9 +787,13 @@ int SensitivityAnalysis::Init(TFile* file, TBranch* branch) {
 int SensitivityAnalysis::Analyze(TFile* file, TBranch* branch) {
     if(loadedDM) return 0;
     TVectorD *v;
+    TH1D* E;
+    file->GetObject("energies", E);
     file->GetObject("xsection", v);
-    if(v)
+    if(v){
         xsection->operator()(0) += v->operator()(0);
+        xsection->operator()(1) += E->GetEntries() / 2.0; //Divide by two because anti-darkmatter is included and we want # of events
+    }
     else
         std::cout << "Root couldn't find crosssection object in file.\n";
     
@@ -795,33 +814,40 @@ int SensitivityAnalysis::Analyze(TFile* file, TBranch* branch) {
 void SensitivityAnalysis::UnInit() {
     if(!loadedDM)
     {
+        xsection->operator()(0) /= (double)files.size();
+        
         dm_cache->cd();
         xsection->Write();
         dm_cache->Write();
     }
-    double dm_pot = std::pow(files.size(),2)/(12*xsection->operator()(0)*1e-40*100*6.022140857e23);
+    double sigma = xsection->operator()(0);
+    double Nx = xsection->operator()(1);
+    double dm_pot = Nx/(sigma*1e-36*100*12*6.022140857e23);
     
     dm_energy->Scale(desired_pot/dm_pot/dm_detector_scale);
     nu_energy->Scale(desired_pot/nu_pot);
 
-    std::vector<double> N_th, N_ex, cs_mean;
     int nbins = dm_energy->GetSize()-1;
-    for(int i = 1; i<nbins; ++i){
-        N_th.push_back(dm_energy->GetBinContent(i)+nu_energy->GetBinContent(i));
-        N_ex.push_back(nu_energy->GetBinContent(i));
-        cs_mean.push_back(theta_avg->GetBinContent(i));
+    
+    //int binstart = 1, binend = nbins;
+    for(int binstart = 1; binstart < nbins; ++binstart){
+        for(int binend = binstart+1; binend<=nbins; ++binend){
+            std::vector<double> N_th, N_ex, cs_mean;
+            for(int i = binstart; i<binend; ++i){
+                N_th.push_back((dm_energy->GetBinContent(i)+nu_energy->GetBinContent(i)) * detector_efficiency);
+                N_ex.push_back((nu_energy->GetBinContent(i)) * detector_efficiency);
+                cs_mean.push_back(theta_avg->GetBinContent(i));
+            }
+            double newchisqr = chisq_pullfunc(N_th, N_ex, cs_mean);
+            if(newchisqr > chisqr){
+                chisqr = newchisqr;
+                binstart_max = dm_energy->GetBinLowEdge(binstart);
+                binend_max = dm_energy->GetBinLowEdge(binend)+dm_energy->GetBinWidth(binend);
+            }
+        }
     }
-    /*for(auto i = N_th.begin(); i!=N_th.end(); ++i)
-        std::cout << *i << " ";
-    std::cout << std::endl << std::endl;
-    for(auto i = N_ex.begin(); i!=N_ex.end(); ++i)
-        std::cout << *i << " ";
-    std::cout << std::endl << std::endl;
-    for(auto i = cs_mean.begin(); i!=cs_mean.end(); ++i)
-        std::cout << *i << " ";
-    std::cout << std::endl << std::endl;*/
-    chisqr = chisq_pullfunc(N_th, N_ex, cs_mean);
-    std::cout << "Chisqr is " << chisqr << std::endl;
+    
+    std::cout << std::scientific << "Chisqr is " << chisqr << ". Cut from " << std::fixed << binstart_max << "(GeV) to " << binend_max << "(GeV)" << std::endl;
     
     delete xsection;
     delete dm_energy;
@@ -835,14 +861,9 @@ SensitivityScan::SensitivityScan() {
 }
 
 int SensitivityScan::Process(const std::vector<std::string>& folders){
-    std::vector<double> mixings, chisqr, masses, chisqr1d, masses1d;
-    double chiscan;
-    double ivpmass, ichimass, ialpha, ikappa;
+    std::vector<double> masses, mixings, chisqr;
     double vpmass, chimass, alpha, kappa;
-    if(DMParameters(folders[0], ivpmass, ichimass, ikappa, ialpha)){
-        std::cout << "Couldn't read DM parameters from " << folders[0] << std::endl;
-        return 1;
-    }
+    std::ofstream sensitivity_output("sensitivity.txt");
     
     for(auto i = folders.begin(); i!=folders.end(); ++i){
         struct stat st;
@@ -867,10 +888,7 @@ int SensitivityScan::Process(const std::vector<std::string>& folders){
             mixings.push_back(mixing);
             chisqr.push_back(analysis.chisqr);
             masses.push_back(chimass);
-            if(ivpmass==vpmass && ialpha==alpha && ikappa==kappa){
-                chisqr1d.push_back(analysis.chisqr);
-                masses1d.push_back(chimass);
-            }
+            sensitivity_output << vpmass << "," << chimass << "," << kappa << "," << alpha << "," << mixing << "," << analysis.chisqr << "," << analysis.binstart_max << "," << analysis.binend_max << std::endl;
         }
     }
     
@@ -879,16 +897,14 @@ int SensitivityScan::Process(const std::vector<std::string>& folders){
         return 1;
     }
     
-    std::stringstream sstitle1, sstitle2;
-    sstitle1 << std::setprecision(6);
-    sstitle1 << "Sensitivity M_{vp}=" << ivpmass << " #kappa=" << ikappa << " #alpha=" << ialpha << ";M_{#chi} (GeV);#Chi^{2}";
+    std::stringstream sstitle;
     
-    sstitle2 << std::setprecision(6);
-    sstitle2 << "Sensitivity #alpha=" << ialpha << ";m_{#Chi} (GeV);y=#epsilon^{2}#alpha(m_{#Chi}/m_{A'})^{4}";
+    sstitle << std::setprecision(6);
+    sstitle << "Sensitivity #alpha=" << alpha << ";m_{#Chi} (GeV);y=#epsilon^{2}#alpha(m_{#Chi}/m_{A'})^{4}";
     
-    std::string title1 = sstitle1.str();
-    std::string title2 = sstitle2.str();
+    std::string title = sstitle.str();
     
+    std::vector<TMarker*> markers;
     TCanvas* canvas = new TCanvas("c1","canvas",1024,576);
     //canvas->SetLogx();
     //canvas->SetLogy();
@@ -898,9 +914,20 @@ int SensitivityScan::Process(const std::vector<std::string>& folders){
     //gStyle->SetNumberContours(100);
     
     TGraph2D* graph2 = new TGraph2D(masses.size());
+    graph2->SetTitle(title.c_str());
+    graph2->GetHistogram()->GetXaxis()->SetLabelSize(0);
+    graph2->GetHistogram()->GetXaxis()->SetTickLength(0);
+    graph2->GetHistogram()->GetYaxis()->SetLabelSize(0);
+    graph2->GetHistogram()->GetYaxis()->SetTickLength(0);
+    
     for(int i = 0; i<masses.size(); ++i)
     {
-        graph2->SetPoint(i, std::log10(masses[i]),std::log10(mixings[i]),chisqr[i]);
+        double mass = std::log10(masses[i]), mixing = std::log10(mixings[i]);
+        graph2->SetPoint(i, mass, mixing, chisqr[i]);
+        
+        TMarker* m = new TMarker(mass, mixing, 0);
+        m->SetMarkerStyle(7);
+        markers.push_back(m);
     }
     
     double minx = graph2->GetXmin();
@@ -911,35 +938,7 @@ int SensitivityScan::Process(const std::vector<std::string>& folders){
     TGaxis *yLogaxis = new TGaxis(minx, miny, minx, maxy, *std::min_element(mixings.begin(), mixings.end()), *std::max_element(mixings.begin(), mixings.end()), 510, "G");
     //graph2->SetNpx(500);
     //graph2->SetNpy(500);
-    graph2->SetTitle(title2.c_str());
     
-    //hist.Draw("");
-    //graph2->Draw("col box scat");
-    //graph2->Draw("SAME CONT1Z");
-    graph2->Draw("CONT1Z");
-    xLogaxis->Draw();
-    yLogaxis->Draw();
-    
-    std::vector<TMarker*> markers;
-    for(int i = 0; i<masses.size(); ++i)
-    {
-        TMarker* m = new TMarker(std::log10(masses[i]), std::log10(mixings[i]), 0);
-        m->SetMarkerStyle(7);
-        m->Draw("");
-        markers.push_back(m);
-    }
-    graph2->GetHistogram()->GetXaxis()->SetLabelSize(0);
-    graph2->GetHistogram()->GetXaxis()->SetTickLength(0);
-    graph2->GetHistogram()->GetYaxis()->SetLabelSize(0);
-    graph2->GetHistogram()->GetYaxis()->SetTickLength(0);
-    graph2->GetHistogram()->GetYaxis()->SetTitleOffset(1);
-    canvas->Update();
-    canvas->SaveAs("SensitivityContours.png");
-    
-    double level = 0.9;
-    graph2->GetHistogram()->SetContour(1, &level);
-    
-    //hist.Draw("");
     //graph2->Draw("col box scat");
     //graph2->Draw("SAME CONT1Z");
     graph2->Draw("CONT1Z");
@@ -947,9 +946,27 @@ int SensitivityScan::Process(const std::vector<std::string>& folders){
     yLogaxis->Draw();
     
     for(auto i = markers.begin(); i!=markers.end(); ++i)
-        (*i)->Draw("SAME");
+        (*i)->Draw();
+    
     canvas->Update();
-    //graph2->GetZaxis()->SetRangeUser(1e-4, 1e3);
+    canvas->SaveAs("SensitivityContours.png");
+    
+    double level = 0.9;
+    graph2->GetHistogram()->SetContour(1, &level);
+    
+    //graph2->Draw("col box scat");
+    //graph2->Draw("SAME CONT1Z");
+    graph2->Draw("CONT1Z");
+    xLogaxis->Draw();
+    yLogaxis->Draw();
+    
+    for(auto i = markers.begin(); i!=markers.end(); ++i)
+        (*i)->Draw();
+    
+    graph2->GetHistogram()->GetZaxis()->SetLabelOffset(999);
+    graph2->GetHistogram()->GetZaxis()->SetLabelSize(0);
+    graph2->GetHistogram()->GetZaxis()->SetTickLength(0);
+    canvas->Update();
     canvas->SaveAs("Sensitivity90.png");
     
     for(auto i = markers.begin(); i!=markers.end(); ++i)

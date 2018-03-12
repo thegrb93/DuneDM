@@ -1,6 +1,7 @@
 #pragma once
 #include "cxxopts.hpp"
 #include <string>
+#include <fstream>
 #include <vector>
 #include <TROOT.h>
 #include <TVectorD.h>
@@ -55,7 +56,7 @@ class DetectorAnalysis : public DMAnalysis
 	double smear_sigma;
 	double smear_mean;
 	double dm_detector_scale, nu_detector_scale;
-	double xsection;
+	double xsection, totalevents;
     bool normalize_histos;
 public:
 	DetectorAnalysis();
@@ -70,6 +71,7 @@ class SensitivityAnalysis : public DMAnalysis
 {
 	double smear_sigma;
 	double smear_mean;
+    double detector_efficiency;
 	TH1D *dm_energy, *nu_energy;
 	TProfile *theta_avg;
 	TFile* nu_cache, *dm_cache;
@@ -78,6 +80,7 @@ class SensitivityAnalysis : public DMAnalysis
 public:
     double dm_detector_scale, nu_detector_scale;
     double chisqr;
+    double binstart_max, binend_max;
 	SensitivityAnalysis();
 	~SensitivityAnalysis();
 protected:
