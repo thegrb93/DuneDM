@@ -10,7 +10,7 @@
 
 DMscattering::DMscattering() {
     std::ifstream fneutrino("data/nusec_nc_dat.txt");
-    while(fneutrino.good())
+    while(fneutrino)
     {
         size_t size = neutrino_energy.size();
         neutrino_energy.resize(size+1);
@@ -19,18 +19,18 @@ DMscattering::DMscattering() {
         fneutrino >> neutrino_sigma[size];
     }
 }
-// Electron energy as a function of 
+// Electron energy as a function of
 // electron scattering angle cross and dark matter energy
 double DMscattering::EeTheta (double EDM, double Thetael, double MDM) {
 	double rEeTheta;
-	double Me = 0.000511; 
+	double Me = 0.000511;
 	double EeThetaN, EeThetaD;
 	EeThetaN = Me*((EDM+Me)*(EDM+Me)+(EDM*EDM-MDM*MDM)*cos(Thetael)*cos(Thetael));
 	EeThetaD = (EDM+Me)*(EDM+Me)-(EDM*EDM-MDM*MDM)*cos(Thetael)*cos(Thetael);
 	rEeTheta = EeThetaN/EeThetaD;
 	return(rEeTheta);
 }
-// Maximum electron energy as a function of 
+// Maximum electron energy as a function of
 // dark matter energy and mass
 double DMscattering::EeTMax (double EDM, double MDM) {
 	double rEeTMax;
@@ -39,7 +39,7 @@ double DMscattering::EeTMax (double EDM, double MDM) {
         //std::cout<<"Eemax"<<rEeTMax<<std::endl;
 	return(rEeTMax);
 }
-// Minimum electron energy as a function of 
+// Minimum electron energy as a function of
 // dark matter energy and mass
 double DMscattering::EeTMin (double EDM, double MDM) {
 	double rEeTMin;
@@ -95,9 +95,9 @@ double DMscattering::nudSigmadEe (double nE, double theta ) {
     return dsigmadne;
 }
 
-// Function F2(Ee) 
+// Function F2(Ee)
 // Total DM - electron scattering cross section equals
-// sigma =  4*Pi*kappa*kappa*alpha*alphaD*( F2(EeMax)- F2(EeMin) ) 
+// sigma =  4*Pi*kappa*kappa*alpha*alphaD*( F2(EeMax)- F2(EeMin) )
 double DMscattering::F2 (double Ee, double EDM, double MDM, double MDP) {
 	double rF2;
 	double Me = 0.000511;
@@ -126,9 +126,9 @@ bool DMscattering::probscatter (double MDP, double MDM, double kap, double alD, 
 	double pscat, Rscat;
 	double XS;
 	double prob;
-	double pMax0 = 1.0e-10;
+	static double pMax0 = 1.0e-15;
 	double ne = 5.1e+23;
-	//int Nscatter;	
+	//int Nscatter;
 	double convmcm, convGeV2cm2;
 	convGeV2cm2 = 3.89e-28;
 	convmcm = 100.0;
@@ -138,7 +138,7 @@ bool DMscattering::probscatter (double MDP, double MDM, double kap, double alD, 
     XS = sigma(DM.E,MDM,MDP,kap,alD);
     XS = XS*convGeV2cm2;
     prob = XS*ne*LXdet;
-    
+
     if (prob > pMax0)
     {
         pMax0 = prob;
@@ -152,7 +152,7 @@ bool DMscattering::probscatterNeutrino (Particle& DM, double LXdet) {
 	double pscat, Rscat;
 	double XS;
 	double prob;
-	double pMax0 = 1.0e-14;
+	static double pMax0 = 1.0e-15;
 	double ne = 5.1e+23;
 	//int Nscatter;
 	double convmcm, convGeV2cm2;

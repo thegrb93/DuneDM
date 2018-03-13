@@ -10,7 +10,7 @@ cxxopts::Options options("DuneDM", "USAGE: DuneDM [options] files");
 
 int main (int argc, char** argv) {
     options.add_options()
-            ("mode", "Which analysis mode to use. Can be 'statistics', 'sensitivity', or 'detector'.", cxxopts::value<std::string>(), "")
+            ("mode", "Which analysis mode to use. Can be 'sensitivity', or 'detector'.", cxxopts::value<std::string>(), "")
             ("particle", "Particle pdgcode to analyze", cxxopts::value<int>(), "")
             ("attribute", "The particle attribute to analyze", cxxopts::value<std::string>(), "")
             ("detector", "Which detector type to use. Can be 'DUNE'.", cxxopts::value<std::string>(), "")
@@ -29,11 +29,7 @@ int main (int argc, char** argv) {
         catch(...){ mode = "detector"; }
         if(mode.empty())
             mode = "detector";
-        
-        auto statistics = [](const std::vector<std::string>& folders){
-            StatisticsAnalysis analysis;
-            return analysis.Process(folders[0]);
-        };
+
         auto detector = [](const std::vector<std::string>& folders){
             DetectorAnalysis analysis;
             return analysis.Process(folders[0]);
@@ -42,9 +38,8 @@ int main (int argc, char** argv) {
             SensitivityScan analysis;
             return analysis.Process(folders);
         };
-        
+
         std::map<std::string,int(*)(const std::vector<std::string>&)> modes = {
-            {"statistics", statistics},
             {"detector", detector},
             {"sensitivity", sensitivity}
         };

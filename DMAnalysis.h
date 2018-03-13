@@ -33,22 +33,6 @@ protected:
 	virtual void UnInit() = 0;
 };
 
-class StatisticsAnalysis : public DMAnalysis
-{
-	TGraph2D* graphchi2, *graphdmee, *graphnuee, *graphsig, *graphbg;
-	TH1D* neutrino_electron_e;
-	int index;
-	
-public:
-	StatisticsAnalysis();
-	~StatisticsAnalysis();
-
-protected:
-	int Analyze(TFile*, TBranch*);
-	int Init(TFile*, TBranch*);
-	void UnInit();
-};
-
 class DetectorAnalysis : public DMAnalysis
 {
     DMHistograms* hists;

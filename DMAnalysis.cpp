@@ -446,126 +446,6 @@ int DMAnalysis::Process(std::string folder) {
 ////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////
-
-StatisticsAnalysis::StatisticsAnalysis(){
-}
-
-StatisticsAnalysis::~StatisticsAnalysis(){
-    delete graphchi2;
-    delete graphdmee;
-    delete graphsig;
-    delete graphbg;
-    delete neutrino_electron_e;
-}
-
-int StatisticsAnalysis::Init(TFile*, TBranch*){
-    graphchi2 = new TGraph2D((int)files.size());
-    graphchi2->SetName("chi2");
-    graphchi2->SetTitle("Dark Matter #chi^{2};VP mass(GeV);#chi mass(GeV);#chi^{2}");
-
-    graphsig = new TGraph2D((int)files.size());
-    graphsig->SetName("signal");
-    graphsig->SetTitle("Signal;VP mass(GeV);#chi mass(GeV);Counts");
-
-    graphbg = new TGraph2D((int)files.size());
-    graphbg->SetName("bg");
-    graphbg->SetTitle("Background;VP mass(GeV);#chi mass(GeV);Counts");
-
-    graphdmee = new TGraph2D((int)files.size());
-    graphdmee->SetName("dmee");
-    graphdmee->SetTitle("Electron Scatter E against dm Mean;VP mass(GeV);#chi mass(GeV);E(GeV)");
-
-    neutrino_electron_e = new TH1D("nuee3","Nu-Electron Scatter E;E (GeV)", 100, 0, 6);
-
-    iterateNeutrino(1,
-    [=](Particle& neutrino, double weight){
-    //nupz1->Fill(neutrino.pz, weight);
-        //nue1->Fill(neutrino.E, weight);
-    },
-    [=](Particle& neutrino, double tmin, double tmax, double weight){
-        //nupz2->Fill(neutrino.pz, weight);
-        //nue2->Fill(neutrino.E, weight);
-    },
-    [=](Particle&, Particle& neutrino, Particle& electron, double time, double weight){
-        //nupz3->Fill(neutrino.pz, weight);
-        //nue3->Fill(neutrino.E, weight);
-
-        //nu_epz1->Fill(electron.pz, weight);
-        //neutrino_electron_e->Fill(electron.E, weight);
-
-        //double pnorm = sqrt(electron.px*electron.px+electron.py*electron.py+electron.pz*electron.pz);
-        //nu_ethe1->Fill(acos(std::min<double>(std::max<double>(electron.pz/pnorm, -1), 1));
-    });
-
-    return 0;
-}
-
-int StatisticsAnalysis::Analyze(TFile* file, TBranch* branch){
-    TH1D* dm_electron_e = new TH1D("dme","DM-Electron Scatter E;E (GeV)", 100, 0, 6);
-
-    iterateDarkmatter(1, branch, vpmass, chimass, kappa, alpha,
-    [=](Particle& darkmatter, double tmin, double tmax){
-    },
-    [=](Particle&, Particle&, Particle& electron, double time){
-        dm_electron_e->Fill(electron.E);
-    });
-
-    double chi2 = 0;
-    for(int i = 1; i<=dm_electron_e->GetNbinsX(); ++i)
-    {
-        double N_bg = neutrino_electron_e->GetBinContent(i);
-        double N_tot = dm_electron_e->GetBinContent(i) + N_bg;
-        if(N_bg == 0) continue;
-        chi2 += 2*(N_bg*log(N_bg/N_tot) + N_tot - N_bg);
-    }
-
-    graphsig->SetPoint(index, vpmass, chimass, dm_electron_e->Integral());
-    graphchi2->SetPoint(index, vpmass, chimass, chi2);
-    graphdmee->SetPoint(index, vpmass, chimass, dm_electron_e->GetMean(1));
-    ++index;
-
-    delete dm_electron_e;
-    return 0;
-}
-
-void StatisticsAnalysis::UnInit(){
-    /*mkdir("images", S_IRWXU | S_IRWXG | S_IRWXO);
-    std::string params(argv[2]);
-    std::string outputfilen(argv[3]);*/
-
-    TCanvas* canvas = new TCanvas("output", "", 1920,1080);
-    canvas->SetFillColor(33);
-    canvas->SetFrameFillColor(17);
-    canvas->SetGrid();
-
-    canvas->SetTheta(-90);
-    canvas->SetPhi(-0.0001);
-
-    graphchi2->Draw("surf1 Z");
-    canvas->Update();
-    canvas->SaveAs("chi2.png");
-
-    graphsig->Draw("surf1 Z");
-    canvas->Update();
-    canvas->SaveAs("sig.png");
-
-    graphdmee->Draw("surf1 Z");
-    canvas->Update();
-    canvas->SaveAs("dme.png");
-
-    neutrino_electron_e->Draw();
-    canvas->Update();
-    canvas->SaveAs("nue.png");
-
-    /*canvas->Draw();
-    gApp->Run();*/
-
-    delete canvas;
-}
-
-////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////
 DetectorAnalysis::DetectorAnalysis(){
     dm_detector_scale = 100;
     nu_detector_scale = 1000;
@@ -636,7 +516,7 @@ int DetectorAnalysis::Init(TFile* file, TBranch* branch) {
         [=](Particle& neutrino, double tmin, double tmax, double weight){
             hists->AddDetectorNu(neutrino.E, neutrino.pz, neutrino.pt, neutrino.theta, weight);
         },
-        [=](Particle&, Particle& neutrino, Particle& electron, double time, double weight){
+        [=](Particle& neutrino, Particle&, Particle& electron, double time, double weight){
             hists->AddScatterNu(neutrino.E, neutrino.pz, neutrino.pt, neutrino.theta, weight);
             hists->AddScatterBgElectron(electron.E, electron.pz, electron.pt, electron.theta, time, weight);
         });
@@ -672,7 +552,7 @@ int DetectorAnalysis::Analyze(TFile* file, TBranch* branch) {
     [=](Particle& darkmatter, double tmin, double tmax){
         hists->AddDetectorDM(darkmatter.E, darkmatter.normpx*tmin, darkmatter.normpy*tmin, darkmatter.px, darkmatter.py, darkmatter.pz, darkmatter.pt, darkmatter.theta, darkmatter.phi);
     },
-    [=](Particle&, Particle& darkmatter, Particle& electron, double time){
+    [=](Particle& darkmatter, Particle&, Particle& electron, double time){
         hists->AddScatterDM(darkmatter.E, darkmatter.pz, darkmatter.pt, darkmatter.theta);
         hists->AddScatterSigElectron(electron.E, electron.pz, electron.pt, electron.theta, time);
     });
@@ -952,7 +832,7 @@ int SensitivityScan::Process(const std::vector<std::string>& folders){
     graph1->Draw("CONT1Z");
     {
         std::ofstream curve("curve.txt");
-        TList* list = graph2->GetContourList(0.9);
+        TList* list = graph1->GetContourList(0.9);
         if(!list) std::cout << "Contour list is NULL!" << std::endl;
         TIter next(list);
         TGraph* obj;
@@ -983,7 +863,7 @@ int SensitivityScan::Process(const std::vector<std::string>& folders){
                         double perpx2 = newx + normy*spacing;
                         double perpy2 = newy - normx*spacing;
 
-                        TMarker* m;
+                        /*TMarker* m;
                         m = new TMarker(newx, newy, 0);
                         m->SetMarkerStyle(7);
                         markers.push_back(m);
@@ -994,7 +874,7 @@ int SensitivityScan::Process(const std::vector<std::string>& folders){
 
                         m = new TMarker(perpx2, perpy2, 0);
                         m->SetMarkerStyle(7);
-                        markers.push_back(m);
+                        markers.push_back(m);*/
 
                         curve << std::pow(10, newx) << " " << std::pow(10, newy) << std::endl;
                         curve << std::pow(10, perpx1) << " " << std::pow(10, perpy1) << std::endl;
@@ -1019,6 +899,7 @@ int SensitivityScan::Process(const std::vector<std::string>& folders){
     graph2->GetHistogram()->GetXaxis()->SetTickLength(0);
     graph2->GetHistogram()->GetYaxis()->SetLabelSize(0);
     graph2->GetHistogram()->GetYaxis()->SetTickLength(0);
+    graph2->GetHistogram()->GetYaxis()->SetTitleOffset(1.2);
 
     canvas->Update();
     canvas->SaveAs("SensitivityContours.png");
