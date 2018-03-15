@@ -30,6 +30,7 @@
 // Header files for the classes stored in the TTree if any.
 #include "ExRootClasses.h"
 #include "TClonesArray.h"
+#include "dk2nu.h"
 
 // Detector sensitivity headers
 #include "Particle.h"
@@ -53,6 +54,10 @@ void getFolderFiles(std::string path, std::vector<std::string>& files) {
                 files.push_back(path+"/"+std::string(epdf->d_name));
         }
     }
+}
+
+inline double calcDMPOT(double totalevents, double xsection){
+    return totalevents/(xsection*1e-36*12*100*6.022140857e23);
 }
 
 std::regex param_match(".*?DM_([\\d\\.]+)_([\\d\\.]+)_([\\d\\.]+)_([\\d\\.]+).*");
@@ -89,148 +94,9 @@ int DMParameters(const std::string& filen, double& vpmass, double& chimass, doub
     return 1;
 }
 
-inline void calculateNeutrinoNearDetector(int ptype, int Ntype, double ppenergy, double ppdxdz, double ppdydz, double pppz, double Necm, double pdPx, double pdPy, double pdPz, double Vx, double Vy, double Vz, double mupare, double muparpx, double muparpy, double muparpz, double Nimpwt, double& nu_energy, double p_nu[3], double& weight) {
-    const double detx = 0.0;
-    const double dety = 0.0;
-    const double detz = 57400.0;
-    const double rdet = 100.0;
-
-    const double mumass  =    0.105658389;
-    const double taumass =    1.77682;
-
-    double parent_mass;
-    switch(ptype)
-    {
-        case 5:
-        case 6:
-            parent_mass = mumass; //Muon mass (GeV)
-            break;
-        case 8:
-        case 9:
-            parent_mass = 0.13957; //Pi mass (GeV)
-            break;
-        case 10:
-            parent_mass = 0.49767; //Keon0 mass (GeV)
-            break;
-        case 11:
-        case 12:
-            parent_mass = 0.49368; //Keon mass (GeV)
-            break;
-        default:
-            std::cout << "INVALID NEUTRINO PARENT! " << ptype << std::endl;
-            weight = 0;
-            return;
-    }
-    double parent_energy = sqrt(pdPx*pdPx +
-                                pdPy*pdPy +
-                                pdPz*pdPz +
-                                parent_mass*parent_mass);
-    double gamma = parent_energy / parent_mass;
-    double gamma_sqr = gamma*gamma;
-    double beta_mag = sqrt((gamma_sqr-1.)/gamma_sqr);
-
-    double rad = sqrt((detx-Vx)*(detx-Vx) +
-                      (dety-Vy)*(dety-Vy) +
-                      (detz-Vz)*(detz-Vz));
-
-    double parentp = sqrt((pdPx*pdPx)+
-                          (pdPy*pdPy)+
-                          (pdPz*pdPz));
-    double costh_pardet = (pdPx*(detx-Vx) +
-                           pdPy*(dety-Vy) +
-                           pdPz*(detz-Vz))/(parentp*rad);
-
-    if (costh_pardet>1.) costh_pardet = 1.;
-    else if (costh_pardet<-1.) costh_pardet = -1.;
-    double theta_pardet = acos(costh_pardet);
-
-    double emrat = 1./(gamma*(1. - beta_mag * cos(theta_pardet)));
-    double sangdet = (rdet*rdet /(rad*rad)/ 4.);
-
-    nu_energy = emrat*Necm;
-    weight = sangdet * emrat * emrat * Nimpwt / M_PI;
-
-    //done for all except polarized muon
-    // in which case need to modify weight
-    if (ptype==5 || ptype==6)
-    {
-        //boost new neutrino to mu decay cm
-        double beta[3];
-        beta[0]=pdPx / parent_energy;
-        beta[1]=pdPy / parent_energy;
-        beta[2]=pdPz / parent_energy;
-
-        p_nu[0] = (detx - Vx) * nu_energy / rad;
-        p_nu[1] = (dety - Vy) * nu_energy / rad;
-        p_nu[2] = (detz - Vz) * nu_energy / rad;
-
-        double partial = gamma*(beta[0]*p_nu[0]+
-                                beta[1]*p_nu[1]+
-                                beta[2]*p_nu[2]);
-        partial = nu_energy-partial / (gamma+1.);
-        double p_dcm_nu[4];
-        for (int i=0;i<3;i++) p_dcm_nu[i]=p_nu[i]-beta[i]*gamma*partial;
-        p_dcm_nu[3]=0.;
-        for (int i=0;i<3;i++) p_dcm_nu[3]+=p_dcm_nu[i]*p_dcm_nu[i];
-        p_dcm_nu[3]=sqrt(p_dcm_nu[3]);
-
-        //boost parent of mu to mu production cm
-        gamma= ppenergy / parent_mass;
-        beta[0] = ppdxdz * pppz / ppenergy;
-        beta[1] = ppdydz * pppz / ppenergy;
-        beta[2] =                  pppz / ppenergy;
-        partial = gamma*(beta[0]*muparpx+
-                         beta[1]*muparpy+
-                         beta[2]*muparpz);
-        partial = mupare - partial / (gamma+1.);
-        double p_pcm_mp[4];
-        p_pcm_mp[0]=muparpx-beta[0]*gamma*partial;
-        p_pcm_mp[1]=muparpy-beta[1]*gamma*partial;
-        p_pcm_mp[2]=muparpz-beta[2]*gamma*partial;
-        p_pcm_mp[3]=0.;
-        for (int i=0;i<3;i++) p_pcm_mp[3]+=p_pcm_mp[i]*p_pcm_mp[i];
-        p_pcm_mp[3]=sqrt(p_pcm_mp[3]);
-
-        double wt_ratio = 1.;
-        //have to check p_pcm_mp
-        //it can be 0 if mupar..=0. (I guess muons created in target??)
-        if (p_pcm_mp[3] != 0. ) {
-            //calc new decay angle w.r.t. (anti)spin direction
-            double costh = (p_dcm_nu[0]*p_pcm_mp[0]+
-                            p_dcm_nu[1]*p_pcm_mp[1]+
-                            p_dcm_nu[2]*p_pcm_mp[2])/(p_dcm_nu[3]*p_pcm_mp[3]);
-
-            if (costh>1.) costh = 1.;
-            else if (costh<-1.) costh = -1.;
-
-            //calc relative weight due to angle difference
-            if (Ntype == 53 || Ntype == 52)
-            {
-                wt_ratio = 1.-costh;
-            }
-            else if (Ntype == 56 || Ntype == 55)
-            {
-                double xnu = 2.* Necm / mumass;
-                wt_ratio = ( (3.-2.*xnu) - (1.-2.*xnu)*costh ) / (3.-2.*xnu);
-            }
-            else if (Ntype == 58 || Ntype == 59)
-            {
-                double xnu = 2.* Necm / taumass;
-                wt_ratio = ( (3.-2.*xnu) - (1.-2.*xnu)*costh ) / (3.-2.*xnu);
-                std::cout << "calculating weight for tau neutrino; this may not be correct" << std::endl;
-            }
-            else
-            {
-                std::cout << "eventRates:: Bad neutrino type = " << Ntype << std::endl;
-            }
-        }
-        weight *= wt_ratio;
-    }
-}
-
 void iterateNeutrino(int detector_scale,
     std::function<void(Particle&, double)> fproduction,
-    std::function<void(Particle&, double, double, double)> fdetector,
+    std::function<void(Particle&, double)> fdetector,
     std::function<void(Particle&, Particle&, Particle&, double, double)> fscatter
 ){
     std::string neutrino_path = options["neutrinos"].as<std::string>();
@@ -252,69 +118,38 @@ void iterateNeutrino(int detector_scale,
     for (auto filen = neutrino_files.begin(); filen != neutrino_files.end(); ++filen) {
         TFile *neutrinos = new TFile(filen->c_str());
         std::cout << neutrinos->GetPath() << std::endl;
-        TTree *neutrino_tree = (TTree *) neutrinos->Get("nudata");
+        TTree *neutrino_tree = (TTree *) neutrinos->Get("dk2nuTree");
         if(!neutrino_tree){
             delete neutrinos;
             continue;
         }
-        neutrino_tree->SetMakeClass(1);
-        int ptype, Ntype;
-        float Necm, ndxdz, ndydz, ndz, pdPx, pdPy, pdPz, Vx, Vy, Vz, ppenergy, ppdxdz, ppdydz, pppz, mupare, muparpx, muparpy, muparpz;
-        double Nimpwt;
-        double NenergyN[5];
-        double NWtNear[5];
-        neutrino_tree->SetBranchAddress("ptype", &ptype);
-        neutrino_tree->SetBranchAddress("Ntype", &Ntype);
-        neutrino_tree->SetBranchAddress("Necm", &Necm);
-        neutrino_tree->SetBranchAddress("Ndxdz", &ndxdz);
-        neutrino_tree->SetBranchAddress("Ndydz", &ndydz);
-        neutrino_tree->SetBranchAddress("Npz", &ndz);
-        neutrino_tree->SetBranchAddress("NenergyN[5]", &NenergyN);
-        neutrino_tree->SetBranchAddress("NWtNear[5]", &NWtNear);
-        neutrino_tree->SetBranchAddress("pdPx", &pdPx);
-        neutrino_tree->SetBranchAddress("pdPy", &pdPy);
-        neutrino_tree->SetBranchAddress("pdPz", &pdPz);
-        neutrino_tree->SetBranchAddress("Vx", &Vx);
-        neutrino_tree->SetBranchAddress("Vy", &Vy);
-        neutrino_tree->SetBranchAddress("Vz", &Vz);
-        neutrino_tree->SetBranchAddress("ppenergy", &ppenergy);
-        neutrino_tree->SetBranchAddress("ppdxdz", &ppdxdz);
-        neutrino_tree->SetBranchAddress("ppdydz", &ppdydz);
-        neutrino_tree->SetBranchAddress("pppz", &pppz);
-        neutrino_tree->SetBranchAddress("mupare", &mupare);
-        neutrino_tree->SetBranchAddress("muparpx", &muparpx);
-        neutrino_tree->SetBranchAddress("muparpy", &muparpy);
-        neutrino_tree->SetBranchAddress("muparpz", &muparpz);
-        neutrino_tree->SetBranchAddress("Nimpwt", &Nimpwt);
+        bsim::Dk2Nu* dk2nu = new bsim::Dk2Nu;
+        neutrino_tree->SetBranchAddress("dk2nu",&dk2nu);
 
         long long neutrino_entries = neutrino_tree->GetEntries();
         for (long long i = 0; i < neutrino_entries; ++i) {
-        //for (long long i = 0; i < neutrino_entries; ++i) {
-        //for(long long i = 0, j = 0; j < neutrino_total; i=(i+1)%neutrino_entries, ++j) {
             neutrino_tree->GetEvent(i);
-            double p_nu[3];
-            double energy, weight;
-            calculateNeutrinoNearDetector(ptype, Ntype, ppenergy, ppdxdz, ppdydz, pppz, Necm, pdPx, pdPy, pdPz, Vx, Vy, Vz, mupare, muparpx, muparpy, muparpz, Nimpwt, energy, p_nu, weight);
-            neutrino.FourMomentum(p_nu[0], p_nu[1], p_nu[2], energy);
 
-            //double weight = Nimpwt * NWtNear[0];
-            //neutrino.FourMomentum(ndxdz*ndz, ndydz*ndz, ndz, NenergyN[0]);
+            int ntype = dk2nu->decay.ntype;
+
+            bsim::NuRay prod_ray = dk2nu->nuray[0];
+            neutrino.FourMomentum(prod_ray.px, prod_ray.py, prod_ray.pz, prod_ray.E);
             neutrino.calcOptionalKinematics();
+            fproduction(neutrino, prod_ray.wgt);
 
-            fproduction(neutrino, weight);
-            double tmin = 0, tmax = 0;
-            if (det.intersect(neutrino.normpx, neutrino.normpy, neutrino.normpz, tmin, tmax)) {
-                fdetector(neutrino, tmin, tmax, weight);
-                double pathlength = tmax-tmin;
-                for(int j = 0; j<detector_scale; ++j){
-                    if (scatter.probscatterNeutrino(neutrino, pathlength)) {
-                        double time = tmin / ( neutrino.norm / neutrino.E * 299792458.0 );
-                        Particle neutrino2 = neutrino;
-                        scatter.scattereventNeutrino(neutrino2, electron);
-                        neutrino2.calcOptionalKinematics();
-                        electron.calcOptionalKinematics();
-                        fscatter(neutrino, neutrino2, electron, time, weight);
-                    }
+            bsim::NuRay det_ray = dk2nu->nuray[1];
+            neutrino.FourMomentum(det_ray.px, det_ray.py, det_ray.pz, det_ray.E);
+            neutrino.calcOptionalKinematics();
+            fdetector(neutrino, det_ray.wgt);
+
+            for(int j = 0; j<detector_scale; ++j){
+                if (scatter.probscatterNeutrino(neutrino, 5.0)) {
+                    double time = 575.0 / ( neutrino.norm / neutrino.E * 299792458.0 );
+                    Particle neutrino2 = neutrino;
+                    scatter.scattereventNeutrino(neutrino2, electron);
+                    neutrino2.calcOptionalKinematics();
+                    electron.calcOptionalKinematics();
+                    fscatter(neutrino, neutrino2, electron, time, det_ray.wgt);
                 }
             }
         }
@@ -513,7 +348,7 @@ int DetectorAnalysis::Init(TFile* file, TBranch* branch) {
         [=](Particle& neutrino, double weight){
             hists->AddProductionNu(neutrino.E, neutrino.pz, neutrino.pt, neutrino.theta, /*ntype,*/ weight);
         },
-        [=](Particle& neutrino, double tmin, double tmax, double weight){
+        [=](Particle& neutrino, double weight){
             hists->AddDetectorNu(neutrino.E, neutrino.pz, neutrino.pt, neutrino.theta, weight);
         },
         [=](Particle& neutrino, Particle&, Particle& electron, double time, double weight){
@@ -567,7 +402,7 @@ void DetectorAnalysis::UnInit() {
         }
         else{
             if(xsection!=0){
-                double dm_pot = totalevents/(xsection*1e-36*12*100*6.022140857e23);
+                double dm_pot = calcDMPOT(totalevents, xsection);
                 double dm_scale = desired_pot/dm_pot;
                 std::cout << "DM Scale: " << dm_scale << std::endl;
                 hists->ScaleDarkmatter(dm_scale, dm_scale/dm_detector_scale);
@@ -625,7 +460,7 @@ int SensitivityAnalysis::Init(TFile* file, TBranch* branch) {
         nu_energy = new TH1D("nuenergy","nuenergy",20,0.3,2);
         iterateNeutrino((int)nu_detector_scale,
         [=](Particle&, double){},
-        [=](Particle&, double, double, double){},
+        [=](Particle&, double){},
         [=](Particle&, Particle& neutrino, Particle& electron, double time, double weight){
             double E = electron.E;
             E += Random::Gauss(smear_mean, smear_sigma / std::sqrt(E));
@@ -700,16 +535,16 @@ void SensitivityAnalysis::UnInit() {
     }
     double sigma = xsection->operator()(0);
     double Nx = xsection->operator()(1);
-    double dm_pot = Nx/(sigma*1e-36*100*12*6.022140857e23);
+    double dm_pot = calcDMPOT(Nx, sigma);
 
     dm_energy->Scale(desired_pot/dm_pot/dm_detector_scale);
     nu_energy->Scale(desired_pot/nu_pot);
 
     int nbins = dm_energy->GetSize()-1;
 
-    //int binstart = 1, binend = nbins;
-    for(int binstart = 1; binstart < nbins; ++binstart){
-        for(int binend = binstart+1; binend<=nbins; ++binend){
+    int binstart = 1, binend = nbins;
+    // for(int binstart = 1; binstart < nbins; ++binstart){
+        // for(int binend = binstart+1; binend<=nbins; ++binend){
             std::vector<double> N_th, N_ex, cs_mean;
             for(int i = binstart; i<binend; ++i){
                 N_th.push_back((dm_energy->GetBinContent(i)+nu_energy->GetBinContent(i)) * detector_efficiency);
@@ -717,13 +552,13 @@ void SensitivityAnalysis::UnInit() {
                 cs_mean.push_back(theta_avg->GetBinContent(i));
             }
             double newchisqr = chisq_pullfunc(N_th, N_ex, cs_mean);
-            if(newchisqr > chisqr){
+            // if(newchisqr > chisqr){
                 chisqr = newchisqr;
                 binstart_max = dm_energy->GetBinLowEdge(binstart);
                 binend_max = dm_energy->GetBinLowEdge(binend)+dm_energy->GetBinWidth(binend);
-            }
-        }
-    }
+            // }
+        // }
+    // }
 
     std::cout << std::scientific << "Chisqr is " << chisqr << ". Cut from " << std::fixed << binstart_max << "(GeV) to " << binend_max << "(GeV)" << std::endl;
 

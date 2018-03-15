@@ -168,7 +168,7 @@ bool DMscattering::probscatterNeutrino (Particle& DM, double LXdet) {
     if (prob > pMax0)
     {
         pMax0 = prob;
-
+        std::cout << pMax0 << std::endl;
     }
     Rscat = prob/pMax0;
 

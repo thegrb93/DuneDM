@@ -83,7 +83,7 @@ double DUNEDetector::thetaenter (double theta) {
 	rthetaenter = acos(root);}
         else
         rthetaenter=0.0;
-        
+
 	return(rthetaenter);
 }
 // polar angle measured from center of detector at which DM exits
@@ -111,7 +111,7 @@ double DUNEDetector::Lenter (double theta) {
 	double Rdet = 6.4;
 	double ddet = 500.0;
 	double thenter = thetaenter(theta);
-	rLenter = Rdet*sin(thenter)/sin(theta); 
+	rLenter = Rdet*sin(thenter)/sin(theta);
 	return(rLenter);
 }
 // distance from target DM exit point of detector
@@ -120,7 +120,7 @@ double DUNEDetector::Lexit (double theta) {
 	double Rdet = 6.4;
 	double ddet = 500.0;
 	double thexit = thetaexit(theta);
-	rLexit = Rdet*sin(thexit)/sin(theta); 
+	rLexit = Rdet*sin(thexit)/sin(theta);
 	return(rLexit);
 }
 // distance DM travels through detector
@@ -134,6 +134,9 @@ double DUNEDetector::Ldet (Particle &DM) {
     }
 }
 //
+bool DUNEDetector::intersect(double x, double y, double z, double dx, double dy, double dz, double& tmin, double& tmax){
+    return intersectAABB(x, y, z, dx, dy, dz, minsx, minsy, minsz, maxsx, maxsy, maxsz, tmin, tmax);
+}
 bool DUNEDetector::intersect(double dx, double dy, double dz, double& tmin, double& tmax){
     return intersectAABB(0, 0, 0, dx, dy, dz, minsx, minsy, minsz, maxsx, maxsy, maxsz, tmin, tmax);
 }

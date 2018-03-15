@@ -12,6 +12,7 @@ public:
 	double Lenter (double);
 	double Lexit (double);
 	double Ldet (Particle &DM);
+	bool intersect (double x, double y, double z, double dx, double dy, double dz, double& tmin, double& tmax);
 	bool intersect (double dx, double dy, double dz, double& tmin, double& tmax);
 };
 

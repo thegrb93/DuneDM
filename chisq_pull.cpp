@@ -45,7 +45,7 @@ vector<double> matrix_inv(vector<vector<double> > &A, vector<double> &B)
 	const unsigned int col1 = A.front().size();
 	vec D(B.size());
 	mat E(row1, col1);
-	
+
 	for (unsigned int i = 0; i < D.n_rows; i++)
 	{
 		D(i) = B.at(i);
@@ -100,7 +100,7 @@ double chisq_pullfunc(vector<double> &N_th, vector<double> &N_ex,
 		b.at(i) = 0;
 		for (unsigned int k = 0; k < N_th.size(); k++)
 		{
-			
+
 			b.at(i)  += ( f.at(k).at(i) * (N_ex.at(k) - N_th.at(k)))
 			             / N_ex.at(k);
 
@@ -167,7 +167,7 @@ double chisq_pullfunc(vector<double> &N_th, vector<double> &N_ex,
 double chisq_pullfunc(vector<double> &N_th, vector<double> &N_ex,
 		      vector<double> &cs_mean)
 {
-    /*std::cout << std::scientific;
+    std::cout << std::scientific;
     for(auto x = N_th.begin(); x!=N_th.end(); ++x)
         std::cout << *x << " ";
     std::cout << std::endl << std::endl;
@@ -176,9 +176,9 @@ double chisq_pullfunc(vector<double> &N_th, vector<double> &N_ex,
     std::cout << std::endl << std::endl;
     for(auto x = cs_mean.begin(); x!=cs_mean.end(); ++x)
         std::cout << *x << " ";
-    std::cout << std::endl << std::endl;*/
-    
-    
+    std::cout << std::endl << std::endl;
+
+
 	double  x_n = 0, s_n = 0, x_k = 0, row1,st_n=0;
 
 	// Errors on different parameter
@@ -202,7 +202,7 @@ double chisq_pullfunc(vector<double> &N_th, vector<double> &N_ex,
 		b.at(i) = 0;
 		for (unsigned int k = 0; k < N_th.size(); k++)
 		{
-			
+
 			b.at(i)  += ( f.at(k).at(i) * (N_ex.at(k) - N_th.at(k)))
 			             / N_ex.at(k);
 
