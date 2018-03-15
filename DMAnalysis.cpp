@@ -41,7 +41,7 @@
 const double emass = 0.000511;
 double desired_pot = 1.47e21 * 3.5 * 0.5; //80GeV POT, 3.5 years, 50% Duty factor
 //double desired_pot = 1.1e21; //120GeV
-double nu_pot = 25000000;
+double nu_pot = 50000000;
 
 void getFolderFiles(std::string path, std::vector<std::string>& files) {
     DIR *dpdf;
@@ -128,19 +128,22 @@ void iterateNeutrino(int detector_scale,
 
         long long neutrino_entries = neutrino_tree->GetEntries();
         for (long long i = 0; i < neutrino_entries; ++i) {
+            if(i%1000==0)
+                std::cout << "\r(" << i << " / " << neutrino_entries << ") completed..." << std::flush;
             neutrino_tree->GetEvent(i);
 
             int ntype = dk2nu->decay.ntype;
+            double nimpwt = dk2nu->decay.nimpwt;
 
             bsim::NuRay prod_ray = dk2nu->nuray[0];
             neutrino.FourMomentum(prod_ray.px, prod_ray.py, prod_ray.pz, prod_ray.E);
             neutrino.calcOptionalKinematics();
-            fproduction(neutrino, prod_ray.wgt);
+            fproduction(neutrino, nimpwt * prod_ray.wgt);
 
             bsim::NuRay det_ray = dk2nu->nuray[1];
             neutrino.FourMomentum(det_ray.px, det_ray.py, det_ray.pz, det_ray.E);
             neutrino.calcOptionalKinematics();
-            fdetector(neutrino, det_ray.wgt);
+            fdetector(neutrino, nimpwt * det_ray.wgt);
 
             for(int j = 0; j<detector_scale; ++j){
                 if (scatter.probscatterNeutrino(neutrino, 5.0)) {
@@ -149,10 +152,13 @@ void iterateNeutrino(int detector_scale,
                     scatter.scattereventNeutrino(neutrino2, electron);
                     neutrino2.calcOptionalKinematics();
                     electron.calcOptionalKinematics();
-                    fscatter(neutrino, neutrino2, electron, time, det_ray.wgt);
+                    fscatter(neutrino, neutrino2, electron, time, nimpwt * det_ray.wgt);
                 }
             }
         }
+        std::cout << std::endl;
+
+        delete dk2nu;
         delete neutrino_tree;
         delete neutrinos;
     }

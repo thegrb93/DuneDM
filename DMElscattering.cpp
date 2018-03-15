@@ -126,7 +126,7 @@ bool DMscattering::probscatter (double MDP, double MDM, double kap, double alD, 
 	double pscat, Rscat;
 	double XS;
 	double prob;
-	static double pMax0 = 1.0e-15;
+	static double pMax0 = 0;
 	double ne = 5.1e+23;
 	//int Nscatter;
 	double convmcm, convGeV2cm2;
@@ -152,7 +152,7 @@ bool DMscattering::probscatterNeutrino (Particle& DM, double LXdet) {
 	double pscat, Rscat;
 	double XS;
 	double prob;
-	static double pMax0 = 1.0e-15;
+	static double pMax0 = 0;
 	double ne = 5.1e+23;
 	//int Nscatter;
 	double convmcm, convGeV2cm2;
@@ -168,7 +168,6 @@ bool DMscattering::probscatterNeutrino (Particle& DM, double LXdet) {
     if (prob > pMax0)
     {
         pMax0 = prob;
-        std::cout << pMax0 << std::endl;
     }
     Rscat = prob/pMax0;
 
@@ -193,9 +192,10 @@ void DMscattering::scatterevent (double MDP, double MDM, double kap, double alD,
     while (1) {
         probe = Random::Flat(0, 1);
         xe = Random::Flat(0, 1);
-        Thetae = xe * Pi / 2;
+        Thetae = xe * Pi;
 
-        Ee = EeMin + xe * (EeMax - EeMin);
+        Ee = EeTheta (DM.E,Thetae,MDM);
+			//Ee = EeMin + xEe*(EeMax-EeMin);
         dsig = dsigmadEe(Ee, DM.E, MDM, MDP, kap, alD);
         psig = (EeMax - EeMin) * dsig / sig;
         Re = psig / psigMax;
@@ -228,11 +228,11 @@ void DMscattering::scattereventNeutrino (Particle& DM, Particle &electron) {
     if(sig<0) return;
     dsigMax = nudSigmadEe(DM.E, 0);
 
-    const double step = 0.01;
-    double integratedSigma = 0;
-    for(double t = 0; t<=Pi/2; t+=step)
-        integratedSigma += nudSigmadEe(DM.E, t)*step;
-//     std::cout << "Emphirical Sigma: " << sig << "     Estimated Sigma: " << 17.23e-43*DM.E << "    Integrated Sigma: " << integratedSigma << std::endl;
+    // const double step = 0.01;
+    // double integratedSigma = 0;
+    // for(double t = 0; t<=Pi/2; t+=step)
+        // integratedSigma += nudSigmadEe(DM.E, t)*step;
+    // std::cout << "Emphirical Sigma: " << sig << "     Estimated Sigma: " << 17.23e-43*DM.E << "    Integrated Sigma: " << integratedSigma << std::endl;
 
     psigMax =(EeMax-EeMin)*dsigMax/sig;
 
@@ -240,7 +240,7 @@ void DMscattering::scattereventNeutrino (Particle& DM, Particle &electron) {
     {
         probe = Random::Flat(0,1);
         xe = Random::Flat(0,1);
-        Thetae = xe*Pi/2;
+        Thetae = xe*Pi;
 
         Ee = EeMin + xe*(EeMax-EeMin);
         dsig = nudSigmadEe(DM.E, Thetae);
