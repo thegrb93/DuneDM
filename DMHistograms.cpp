@@ -54,7 +54,7 @@ DMHistograms::DMHistograms(std::string rname, TFile* dm, TFile* nu, bool nu_exis
     dm_ee1 = new TH1D("dm_ee1","#chi + e^{-} Scatter E;E (GeV)", 100, 0, 15);
     dm_epz1 = new TH1D("dm_epz1","#chi + e^{-} Scatter P_{z};P_{z} (GeV/c)", 100, 0, 6);
     dm_ept1 = new TH1D("dm_ept1","#chi + e^{-} Scatter P_{t};P_{t} (GeV/c)", 100, 0, 6);
-    dm_ethe1 = new TH1D("dm_ethe1","#chi + e^{-} Scatter #theta;#theta", 100, 0, 1.6);
+    dm_ethe1 = new TH1D("dm_ethe1","#chi + e^{-} Scatter #theta;#theta", 100, 0, M_PI);
     dm_ee1smear = new TH1D("dm_ee1smear","#chi + e^{-} Smeared Scatter E;E (GeV)", 100, 0, 15);
     dm_ee1smearr = new TH1D("dm_ee1smearr","#chi + e^{-} Scatter Energy Smearing Ratio;E (GeV)", 40, 0, 15);
 
@@ -105,7 +105,7 @@ DMHistograms::DMHistograms(std::string rname, TFile* dm, TFile* nu, bool nu_exis
         nu_ee1 = new TH1D("nu_ee1","#nu + e^{-} Scatter E;E (GeV)", 100, 0, 15);
         nu_epz1 = new TH1D("nu_epz1","#nu + e^{-} Scatter P_{z};P_{z} (GeV/c)", 100, 0, 6);
         nu_ept1 = new TH1D("nu_ept1","#nu + e^{-} Scatter P_{z};P_{z} (GeV/c)", 100, 0, 6);
-        nu_ethe1 = new TH1D("nu_ethe1","#nu + e^{-} Scatter #theta;#theta", 100, 0, 1.6);
+        nu_ethe1 = new TH1D("nu_ethe1","#nu + e^{-} Scatter #theta;#theta", 100, 0, M_PI);
 
         nu_ee1smear = new TH1D("nu_ee1smear","#nu + e^{-} Smeared Scatter E;E (GeV)", 100, 0, 15);
         nu_ee1smearr = new TH1D("nu_ee1smearr","#nu + e^{-} Scatter Energy Smearing Ratio;E (GeV)", 40, 0, 15);
@@ -489,7 +489,7 @@ void DMHistograms::SaveHistograms() {
     delete canvas;
 }
 
-void DMHistograms::ScaleDarkmatter(double scale, double detscale) {
+void DMHistograms::ScaleDarkmatter(double scale) {
     dmpx1->Scale(scale);
     dmpy1->Scale(scale);
     dmpz1->Scale(scale);
@@ -507,18 +507,18 @@ void DMHistograms::ScaleDarkmatter(double scale, double detscale) {
     dme2->Scale(scale);
     dmthe2->Scale(scale);
     dmphi2->Scale(scale);
-    dme3->Scale(detscale);
-    dmpz3->Scale(detscale);
-    //dmpt3->Scale(detscale);
-    dmthe3->Scale(detscale);
-    dm_ee1->Scale(detscale);
-    dm_epz1->Scale(detscale);
-    dm_ept1->Scale(detscale);
-    dm_ethe1->Scale(detscale);
-    dmtime->Scale(detscale);
+    dme3->Scale(scale);
+    dmpz3->Scale(scale);
+    //dmpt3->Scale(scale);
+    dmthe3->Scale(scale);
+    dm_ee1->Scale(scale);
+    dm_epz1->Scale(scale);
+    dm_ept1->Scale(scale);
+    dm_ethe1->Scale(scale);
+    dmtime->Scale(scale);
 }
 
-void DMHistograms::ScaleNeutrinos(double scale, double detscale) {
+void DMHistograms::ScaleNeutrinos(double scale) {
     nupz1->Scale(scale);
     nupt1->Scale(scale);
     nuthe1->Scale(scale);
@@ -527,15 +527,15 @@ void DMHistograms::ScaleNeutrinos(double scale, double detscale) {
     nupt2->Scale(scale);
     nuthe2->Scale(scale);
     nue2->Scale(scale);
-    nupz3->Scale(detscale);
-    nupt3->Scale(detscale);
-    nuthe3->Scale(detscale);
-    nue3->Scale(detscale);
-    nu_epz1->Scale(detscale);
-    nu_ept1->Scale(detscale);
-    nu_ee1->Scale(detscale);
-    nu_ethe1->Scale(detscale);
-    nutime->Scale(detscale);
+    nupz3->Scale(scale);
+    nupt3->Scale(scale);
+    nuthe3->Scale(scale);
+    nue3->Scale(scale);
+    nu_epz1->Scale(scale);
+    nu_ept1->Scale(scale);
+    nu_ee1->Scale(scale);
+    nu_ethe1->Scale(scale);
+    nutime->Scale(scale);
 }
 
 void DMHistograms::AddProductionDM(TH1D* E, TH1D* Px, TH1D* Py, TH1D* Pz, TH1D* Th, TH1D* Phi) {
@@ -558,23 +558,23 @@ void DMHistograms::AddDetectorDM(double E, double x, double y, double Px, double
     dmthe2->Fill(Th);
     dmphi2->Fill(Phi);
 }
-void DMHistograms::AddScatterDM(double E, double Pz, double Pt, double Th) {
-    dme3->Fill(E);
-    dmpz3->Fill(Pz);
+void DMHistograms::AddScatterDM(double E, double Pz, double Pt, double Th, double W) {
+    dme3->Fill(E, W);
+    dmpz3->Fill(Pz, W);
     //dmpt3->Fill(Pt);
-    dmthe3->Fill(Th);
+    dmthe3->Fill(Th, W);
 
     /*if (smear_sigma > 0) {
         E += Random::Gauss(smear_mean, smear_sigma / sqrt(E));
         dme3smear->Fill(darkmatter1.E);
     }*/
 }
-void DMHistograms::AddScatterSigElectron(double E, double Pz, double Pt, double Th, double time) {
-    dm_ee1->Fill(E);
-    dm_epz1->Fill(Pz);
-    dm_ept1->Fill(Pt);
-    dm_ethe1->Fill(Th);
-    dmtime->Fill(time);
+void DMHistograms::AddScatterSigElectron(double E, double Pz, double Pt, double Th, double time, double W) {
+    dm_ee1->Fill(E, W);
+    dm_epz1->Fill(Pz, W);
+    dm_ept1->Fill(Pt, W);
+    dm_ethe1->Fill(Th, W);
+    dmtime->Fill(time, W);
     /*if (smear_sigma > 0) {
         double Es += Random::Gauss(smear_mean, smear_sigma / sqrt(E));
         dm_ee1smear->Fill(Es);

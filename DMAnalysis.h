@@ -39,7 +39,6 @@ class DetectorAnalysis : public DMAnalysis
 	std::string detectorType;
 	double smear_sigma;
 	double smear_mean;
-	double dm_detector_scale, nu_detector_scale;
 	double xsection, totalevents;
     bool normalize_histos;
 public:
@@ -62,7 +61,6 @@ class SensitivityAnalysis : public DMAnalysis
 	TVectorD* xsection;
 	bool loadedDM;
 public:
-    double dm_detector_scale, nu_detector_scale;
     double chisqr;
     double binstart_max, binend_max;
 	SensitivityAnalysis();

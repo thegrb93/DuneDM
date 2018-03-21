@@ -9,6 +9,7 @@
 
 
 DMscattering::DMscattering() {
+    pMax0 = 0;
     std::ifstream fneutrino("data/nusec_nc_dat.txt");
     while(fneutrino)
     {
@@ -126,7 +127,6 @@ bool DMscattering::probscatter (double MDP, double MDM, double kap, double alD, 
 	double pscat, Rscat;
 	double XS;
 	double prob;
-	static double pMax0 = 0;
 	double ne = 5.1e+23;
 	//int Nscatter;
 	double convmcm, convGeV2cm2;
@@ -152,7 +152,6 @@ bool DMscattering::probscatterNeutrino (Particle& DM, double LXdet) {
 	double pscat, Rscat;
 	double XS;
 	double prob;
-	static double pMax0 = 0;
 	double ne = 5.1e+23;
 	//int Nscatter;
 	double convmcm, convGeV2cm2;
@@ -192,7 +191,7 @@ void DMscattering::scatterevent (double MDP, double MDM, double kap, double alD,
     while (1) {
         probe = Random::Flat(0, 1);
         xe = Random::Flat(0, 1);
-        Thetae = xe * Pi;
+        Thetae = xe * Pi / 2.0;
 
         Ee = EeTheta (DM.E,Thetae,MDM);
 			//Ee = EeMin + xEe*(EeMax-EeMin);
@@ -240,7 +239,7 @@ void DMscattering::scattereventNeutrino (Particle& DM, Particle &electron) {
     {
         probe = Random::Flat(0,1);
         xe = Random::Flat(0,1);
-        Thetae = xe*Pi;
+        Thetae = xe * Pi / 2.0;
 
         Ee = EeMin + xe*(EeMax-EeMin);
         dsig = nudSigmadEe(DM.E, Thetae);

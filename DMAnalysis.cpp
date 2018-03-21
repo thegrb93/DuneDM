@@ -94,7 +94,7 @@ int DMParameters(const std::string& filen, double& vpmass, double& chimass, doub
     return 1;
 }
 
-void iterateNeutrino(int detector_scale,
+void iterateNeutrino(
     std::function<void(Particle&, double)> fproduction,
     std::function<void(Particle&, double)> fdetector,
     std::function<void(Particle&, Particle&, Particle&, double, double)> fscatter
@@ -127,12 +127,12 @@ void iterateNeutrino(int detector_scale,
         neutrino_tree->SetBranchAddress("dk2nu",&dk2nu);
 
         long long neutrino_entries = neutrino_tree->GetEntries();
+        // int total_attempts = 0, success_attempts = 0;
         for (long long i = 0; i < neutrino_entries; ++i) {
-            if(i%1000==0)
-                std::cout << "\r(" << i << " / " << neutrino_entries << ") completed..." << std::flush;
             neutrino_tree->GetEvent(i);
 
-            int ntype = dk2nu->decay.ntype;
+            if(dk2nu->decay.ntype!=12) continue;
+
             double nimpwt = dk2nu->decay.nimpwt;
 
             bsim::NuRay prod_ray = dk2nu->nuray[0];
@@ -145,15 +145,13 @@ void iterateNeutrino(int detector_scale,
             neutrino.calcOptionalKinematics();
             fdetector(neutrino, nimpwt * det_ray.wgt);
 
-            for(int j = 0; j<detector_scale; ++j){
-                if (scatter.probscatterNeutrino(neutrino, 5.0)) {
-                    double time = 575.0 / ( neutrino.norm / neutrino.E * 299792458.0 );
-                    Particle neutrino2 = neutrino;
-                    scatter.scattereventNeutrino(neutrino2, electron);
-                    neutrino2.calcOptionalKinematics();
-                    electron.calcOptionalKinematics();
-                    fscatter(neutrino, neutrino2, electron, time, nimpwt * det_ray.wgt);
-                }
+            if (scatter.probscatterNeutrino(neutrino, 5.0)) {
+                double time = 575.0 / ( neutrino.norm / neutrino.E * 299792458.0 );
+                Particle neutrino2 = neutrino;
+                scatter.scattereventNeutrino(neutrino2, electron);
+                neutrino2.calcOptionalKinematics();
+                electron.calcOptionalKinematics();
+                fscatter(neutrino, neutrino2, electron, time, nimpwt * det_ray.wgt * scatter.pMax0);
             }
         }
         std::cout << std::endl;
@@ -164,9 +162,9 @@ void iterateNeutrino(int detector_scale,
     }
 }
 
-void iterateDarkmatter(int detitr, TBranch* branch, double vpmass, double chimass, double kappa, double alpha,
+void iterateDarkmatter(TBranch* branch, double vpmass, double chimass, double kappa, double alpha,
     std::function<void(Particle&, double, double)> fdetector,
-    std::function<void(Particle&, Particle&, Particle&, double)> fscatter
+    std::function<void(Particle&, Particle&, Particle&, double, double)> fscatter
 ){
     DUNEDetector det;
     DMscattering scatter;
@@ -210,15 +208,13 @@ void iterateDarkmatter(int detitr, TBranch* branch, double vpmass, double chimas
             {
                 fdetector(darkmatter, tmin, tmax);
                 double pathlength = tmax-tmin;
-                for(int j = 0; j<detitr; ++j){
-                    if(scatter.probscatter(vpmass,chimass,kappa,alpha,darkmatter,pathlength)) {
-                        double time = tmin / ( darkmatter.norm / darkmatter.E * 299792458.0 );
-                        Particle darkmatter2 = darkmatter;
-                        scatter.scatterevent(vpmass, chimass, kappa, alpha, darkmatter2, electron);
-                        darkmatter2.calcOptionalKinematics();
-                        electron.calcOptionalKinematics();
-                        fscatter(darkmatter, darkmatter2, electron, time);
-                    }
+                if(scatter.probscatter(vpmass,chimass,kappa,alpha,darkmatter,pathlength)) {
+                    double time = tmin / ( darkmatter.norm / darkmatter.E * 299792458.0 );
+                    Particle darkmatter2 = darkmatter;
+                    scatter.scatterevent(vpmass, chimass, kappa, alpha, darkmatter2, electron);
+                    darkmatter2.calcOptionalKinematics();
+                    electron.calcOptionalKinematics();
+                    fscatter(darkmatter, darkmatter2, electron, time, scatter.pMax0);
                 }
             }
         }
@@ -288,8 +284,6 @@ int DMAnalysis::Process(std::string folder) {
 ////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////
 DetectorAnalysis::DetectorAnalysis(){
-    dm_detector_scale = 100;
-    nu_detector_scale = 1000;
     xsection = 0;
     totalevents = 0;
 }
@@ -350,7 +344,7 @@ int DetectorAnalysis::Init(TFile* file, TBranch* branch) {
     hists = new DMHistograms(runname, dm_output, nu_output, neutrino_exists);
 
     if(!neutrino_exists){
-        iterateNeutrino((int)nu_detector_scale,
+        iterateNeutrino(
         [=](Particle& neutrino, double weight){
             hists->AddProductionNu(neutrino.E, neutrino.pz, neutrino.pt, neutrino.theta, /*ntype,*/ weight);
         },
@@ -389,13 +383,13 @@ int DetectorAnalysis::Analyze(TFile* file, TBranch* branch) {
             std::cout << "Root couldn't find crosssection object in file.\n";
     }
 
-    iterateDarkmatter((int)dm_detector_scale, branch, vpmass, chimass, kappa, alpha,
+    iterateDarkmatter(branch, vpmass, chimass, kappa, alpha,
     [=](Particle& darkmatter, double tmin, double tmax){
         hists->AddDetectorDM(darkmatter.E, darkmatter.normpx*tmin, darkmatter.normpy*tmin, darkmatter.px, darkmatter.py, darkmatter.pz, darkmatter.pt, darkmatter.theta, darkmatter.phi);
     },
-    [=](Particle& darkmatter, Particle&, Particle& electron, double time){
-        hists->AddScatterDM(darkmatter.E, darkmatter.pz, darkmatter.pt, darkmatter.theta);
-        hists->AddScatterSigElectron(electron.E, electron.pz, electron.pt, electron.theta, time);
+    [=](Particle& darkmatter, Particle&, Particle& electron, double time, double weight){
+        hists->AddScatterDM(darkmatter.E, darkmatter.pz, darkmatter.pt, darkmatter.theta, weight);
+        hists->AddScatterSigElectron(electron.E, electron.pz, electron.pt, electron.theta, time, weight);
     });
     return 0;
 }
@@ -411,10 +405,10 @@ void DetectorAnalysis::UnInit() {
                 double dm_pot = calcDMPOT(totalevents, xsection);
                 double dm_scale = desired_pot/dm_pot;
                 std::cout << "DM Scale: " << dm_scale << std::endl;
-                hists->ScaleDarkmatter(dm_scale, dm_scale/dm_detector_scale);
+                hists->ScaleDarkmatter(dm_scale);
             }
             double nu_scale = desired_pot/nu_pot;
-            hists->ScaleNeutrinos(nu_scale, nu_scale/nu_detector_scale);
+            hists->ScaleNeutrinos(nu_scale);
         }
         hists->SaveHistograms();
     }
@@ -431,8 +425,6 @@ SensitivityAnalysis::SensitivityAnalysis(){
     smear_sigma = 0.06;
     chisqr = 0;
     xsection = 0;
-    dm_detector_scale = 100;
-    nu_detector_scale = 1000;
     detector_efficiency = 0.9;
     binstart_max = 0;
     binend_max = 0;
@@ -464,7 +456,7 @@ int SensitivityAnalysis::Init(TFile* file, TBranch* branch) {
     {
         nu_cache = new TFile(neutrino_root.c_str(), "NEW");
         nu_energy = new TH1D("nuenergy","nuenergy",20,0.3,2);
-        iterateNeutrino((int)nu_detector_scale,
+        iterateNeutrino(
         [=](Particle&, double){},
         [=](Particle&, double){},
         [=](Particle&, Particle& neutrino, Particle& electron, double time, double weight){
@@ -474,7 +466,6 @@ int SensitivityAnalysis::Init(TFile* file, TBranch* branch) {
                 nu_energy->Fill(E, weight);
             }
         });
-        nu_energy->Scale(1/nu_detector_scale);
         nu_cache->Write();
     }
 
@@ -518,13 +509,13 @@ int SensitivityAnalysis::Analyze(TFile* file, TBranch* branch) {
     else
         std::cout << "Root couldn't find crosssection object in file.\n";
 
-    iterateDarkmatter((int)dm_detector_scale, branch, vpmass, chimass, kappa, alpha,
+    iterateDarkmatter(branch, vpmass, chimass, kappa, alpha,
     [=](Particle&, double, double){},
-    [=](Particle& darkmatter, Particle&, Particle& electron, double time){
+    [=](Particle& darkmatter, Particle&, Particle& electron, double time, double weight){
         double E = electron.E;
         E += Random::Gauss(smear_mean, smear_sigma / std::sqrt(E));
         if(E>0){
-            dm_energy->Fill(E);
+            dm_energy->Fill(E, weight);
             theta_avg->Fill(E, electron.theta);
         }
     });
@@ -543,7 +534,7 @@ void SensitivityAnalysis::UnInit() {
     double Nx = xsection->operator()(1);
     double dm_pot = calcDMPOT(Nx, sigma);
 
-    dm_energy->Scale(desired_pot/dm_pot/dm_detector_scale);
+    dm_energy->Scale(desired_pot/dm_pot);
     nu_energy->Scale(desired_pot/nu_pot);
 
     int nbins = dm_energy->GetSize()-1;
@@ -609,168 +600,268 @@ int SensitivityScan::Process(const std::vector<std::string>& folders){
 
             double mixing = std::pow(kappa,2)*alpha*std::pow(chimass/vpmass,4);
             mixings.push_back(mixing);
-            //double sigma = ??;
-            //sigmas.push_back(sigma);
+            double sigma = 3.0*mixing/(299792458.0 * 137.035999074 * chimass * chimass);
+            sigmas.push_back(sigma);
 
-            sensitivity_output << vpmass << "," << chimass << "," << kappa << "," << alpha << "," << mixing << "," << analysis.chisqr << "," << analysis.binstart_max << "," << analysis.binend_max << std::endl;
+            sensitivity_output << vpmass << "," << chimass << "," << kappa << "," << alpha << "," << mixing << "," << sigma << "," << analysis.chisqr << "," << analysis.binstart_max << "," << analysis.binend_max << std::endl;
         }
     }
 
-    if(mixings.size()==0){
+    if(masses.size()==0){
         std::cout << "No sensitivities were scanned...\n";
         return 1;
     }
 
-    std::stringstream sstitle;
-
-    sstitle << std::setprecision(6);
-    sstitle << "Sensitivity #alpha=" << alpha << ";m_{#Chi} (GeV);y=#epsilon^{2}#alpha(m_{#Chi}/m_{A'})^{4}";
-
-    std::string title = sstitle.str();
-
-    std::vector<TMarker*> markers;
-    TCanvas* canvas = new TCanvas("c1","canvas",1024,576);
-    //canvas->SetLogx();
-    //canvas->SetLogy();
-    canvas->SetLogz();
-
-    gStyle->SetPalette(55);
-    //gStyle->SetNumberContours(100);
-
-    TGraph2D* graph1 = new TGraph2D(masses.size());
-    graph1->SetName("graph1");
-    TGraph2D* graph2 = new TGraph2D(masses.size());
-    graph2->SetName("graph2");
-    graph2->SetTitle(title.c_str());
-
-    for(int i = 0; i<masses.size(); ++i)
     {
-        double mass = std::log10(masses[i]), kappa = std::log10(kappas[i]), mixing = std::log10(mixings[i]);
-        graph1->SetPoint(i, mass, kappa, chisqr[i]);
-        graph2->SetPoint(i, mass, mixing, chisqr[i]);
+        std::vector<TMarker*> markers;
+        TCanvas* canvas = new TCanvas("c1","canvas",1024,576);
+        gStyle->SetPalette(55);
+        TGraph2D* graph = new TGraph2D(masses.size());
 
-        TMarker* m = new TMarker(mass, mixing, 0);
-        m->SetMarkerStyle(7);
-        markers.push_back(m);
-    }
+        for(int i = 0; i<masses.size(); ++i)
+        {
+            double mass = std::log10(masses[i]), kappa = std::log10(kappas[i]);
+            graph->SetPoint(i, mass, kappa, chisqr[i]);
+        }
 
-    TGaxis* xLogaxis;
-    TGaxis* yLogaxis;
-    {
-        double minx = graph2->GetXmin();
-        double maxx = graph2->GetXmax();
-        double miny = graph2->GetYmin();
-        double maxy = graph2->GetYmax();
-        xLogaxis = new TGaxis(minx, miny, maxx, miny, *std::min_element(masses.begin(), masses.end()), *std::max_element(masses.begin(), masses.end()), 510, "G");
-        yLogaxis = new TGaxis(minx, miny, minx, maxy, *std::min_element(mixings.begin(), mixings.end()), *std::max_element(mixings.begin(), mixings.end()), 510, "G");
-    }
-    //graph2->SetNpx(500);
-    //graph2->SetNpy(500);
+        graph->Draw("CONT1Z");
+        canvas->Update();
+        {
+            std::ofstream curve("curve.txt");
+            TList* list = graph->GetContourList(0.9);
+            if(!list) std::cout << "Contour list is NULL!" << std::endl;
+            TIter next(list);
+            TGraph* obj;
+            while(obj = (TGraph*)next()){
+                bool waslast = false;
+                double used_length = 0;
+                double lastx, lasty;
+                for(int i = 0; i<obj->GetN(); ++i){
+                    double x, y;
+                    obj->GetPoint(i, x, y);
+                    if(waslast){
+                        const double spacing = 0.075;
 
-    //graph2->Draw("col box scat");
-    //graph2->Draw("SAME CONT1Z");
+                        double dirx = x - lastx, diry = y - lasty;
+                        double length = std::sqrt(dirx*dirx + diry*diry);
+                        double normx = dirx / length;
+                        double normy = diry / length;
 
-    graph1->Draw("CONT1Z");
-    {
-        std::ofstream curve("curve.txt");
-        TList* list = graph1->GetContourList(0.9);
-        if(!list) std::cout << "Contour list is NULL!" << std::endl;
-        TIter next(list);
-        TGraph* obj;
-        while(obj = (TGraph*)next()){
-            bool waslast = false;
-            double lastx, lasty;
-            for(int i = 0; i<obj->GetN(); ++i){
-                double x, y;
-                obj->GetPoint(i, x, y);
-                if(waslast){
-                    const double spacing = 0.05;
+                        while(used_length < length)
+                        {
+                            double newx = lastx + normx*used_length;
+                            double newy = lasty + normy*used_length;
+                            double perpx1 = newx - normy*spacing;
+                            double perpy1 = newy + normx*spacing;
+                            double perpx2 = newx + normy*spacing;
+                            double perpy2 = newy - normx*spacing;
 
-                    double dirx = x - lastx, diry = y - lasty;
-                    double length = std::sqrt(dirx*dirx + diry*diry);
+                            TMarker* m;
+                            m = new TMarker(newx, newy, 0);
+                            m->SetMarkerStyle(7);
+                            markers.push_back(m);
 
-                    int count = (int)(length / spacing);
-                    double newspacex = dirx / count;
-                    double newspacey = diry / count;
-                    double normx = dirx / length;
-                    double normy = diry / length;
+                            m = new TMarker(perpx1, perpy1, 0);
+                            m->SetMarkerStyle(7);
+                            markers.push_back(m);
 
-                    for(int o = 0; o<count; ++o)
-                    {
-                        double newx = lastx + newspacex*o;
-                        double newy = lasty + newspacey*o;
-                        double perpx1 = newx - normy*spacing;
-                        double perpy1 = newy + normx*spacing;
-                        double perpx2 = newx + normy*spacing;
-                        double perpy2 = newy - normx*spacing;
+                            m = new TMarker(perpx2, perpy2, 0);
+                            m->SetMarkerStyle(7);
+                            markers.push_back(m);
 
-                        /*TMarker* m;
-                        m = new TMarker(newx, newy, 0);
-                        m->SetMarkerStyle(7);
-                        markers.push_back(m);
+                            curve << std::pow(10, newx) << " " << std::pow(10, newy) << std::endl;
+                            curve << std::pow(10, perpx1) << " " << std::pow(10, perpy1) << std::endl;
+                            curve << std::pow(10, perpx2) << " " << std::pow(10, perpy2) << std::endl;
 
-                        m = new TMarker(perpx1, perpy1, 0);
-                        m->SetMarkerStyle(7);
-                        markers.push_back(m);
-
-                        m = new TMarker(perpx2, perpy2, 0);
-                        m->SetMarkerStyle(7);
-                        markers.push_back(m);*/
-
-                        curve << std::pow(10, newx) << " " << std::pow(10, newy) << std::endl;
-                        curve << std::pow(10, perpx1) << " " << std::pow(10, perpy1) << std::endl;
-                        curve << std::pow(10, perpx2) << " " << std::pow(10, perpy2) << std::endl;
+                            used_length += spacing;
+                        }
+                        used_length -= length;
                     }
+                    else
+                        waslast = true;
+                    lastx = x; lasty = y;
                 }
-                else
-                    waslast = true;
-                lastx = x; lasty = y;
             }
         }
+        double level = 0.9;
+        graph->GetHistogram()->SetContour(1, &level);
+        graph->Draw("CONT1Z");
+        for(auto i = markers.begin(); i!=markers.end(); ++i)
+            (*i)->Draw();
+        canvas->SaveAs("Curve.png");
+
+        for(auto i = markers.begin(); i!=markers.end(); ++i)
+            delete *i;
+        delete graph;
+        delete canvas;
     }
+    {
+        std::vector<TMarker*> markers;
+        std::stringstream sstitle;
+        sstitle << std::setprecision(6);
+        sstitle << "Sensitivity #alpha=" << alpha << ";m_{#Chi} (GeV);Y=#epsilon^{2}#alpha(m_{#Chi}/m_{A'})^{4}";
+        std::string title = sstitle.str();
 
-    graph2->Draw("CONT1Z");
-    xLogaxis->Draw();
-    yLogaxis->Draw();
+        TCanvas* canvas = new TCanvas("c1","canvas",1024,576);
+        canvas->SetLogz();
+        gStyle->SetPalette(55);
+        //gStyle->SetNumberContours(100);
 
-    for(auto i = markers.begin(); i!=markers.end(); ++i)
-        (*i)->Draw();
+        TGraph2D* graph = new TGraph2D(masses.size());
+        graph->SetTitle(title.c_str());
 
-    graph2->GetHistogram()->GetXaxis()->SetLabelSize(0);
-    graph2->GetHistogram()->GetXaxis()->SetTickLength(0);
-    graph2->GetHistogram()->GetYaxis()->SetLabelSize(0);
-    graph2->GetHistogram()->GetYaxis()->SetTickLength(0);
-    graph2->GetHistogram()->GetYaxis()->SetTitleOffset(1.2);
+        for(int i = 0; i<masses.size(); ++i)
+        {
+            double mass = std::log10(masses[i]), mixing = std::log10(mixings[i]);
+            graph->SetPoint(i, mass, mixing, chisqr[i]);
 
-    canvas->Update();
-    canvas->SaveAs("SensitivityContours.png");
+            TMarker* m = new TMarker(mass, mixing, 0);
+            m->SetMarkerStyle(7);
+            markers.push_back(m);
+        }
 
-    double level = 0.9;
-    graph2->GetHistogram()->SetContour(1, &level);
+        TGaxis* xLogaxis;
+        TGaxis* yLogaxis;
+        {
+            double minx = graph->GetXmin();
+            double maxx = graph->GetXmax();
+            double miny = graph->GetYmin();
+            double maxy = graph->GetYmax();
+            xLogaxis = new TGaxis(minx, miny, maxx, miny, *std::min_element(masses.begin(), masses.end()), *std::max_element(masses.begin(), masses.end()), 510, "G");
+            yLogaxis = new TGaxis(minx, miny, minx, maxy, *std::min_element(mixings.begin(), mixings.end()), *std::max_element(mixings.begin(), mixings.end()), 510, "G");
+        }
+        //graph->SetNpx(500);
+        //graph->SetNpy(500);
 
-    //graph2->Draw("col box scat");
-    //graph2->Draw("SAME CONT1Z");
+        //graph->Draw("col box scat");
+        //graph->Draw("SAME CONT1Z");
 
-    graph2->Draw("CONT1Z");
-    xLogaxis->Draw();
-    yLogaxis->Draw();
+        graph->Draw("CONT1Z");
+        xLogaxis->Draw();
+        yLogaxis->Draw();
 
-    for(auto i = markers.begin(); i!=markers.end(); ++i)
-        (*i)->Draw();
+        for(auto i = markers.begin(); i!=markers.end(); ++i)
+            (*i)->Draw();
 
-    graph2->GetHistogram()->GetZaxis()->SetLabelOffset(999);
-    graph2->GetHistogram()->GetZaxis()->SetLabelSize(0);
-    graph2->GetHistogram()->GetZaxis()->SetTickLength(0);
+        graph->GetHistogram()->GetXaxis()->SetLabelSize(0);
+        graph->GetHistogram()->GetXaxis()->SetTickLength(0);
+        graph->GetHistogram()->GetYaxis()->SetLabelSize(0);
+        graph->GetHistogram()->GetYaxis()->SetTickLength(0);
+        graph->GetHistogram()->GetYaxis()->SetTitleOffset(1.2);
 
-    canvas->Update();
-    canvas->SaveAs("Sensitivity90.png");
+        canvas->Update();
+        canvas->SaveAs("SensitivityMixing.png");
 
-    for(auto i = markers.begin(); i!=markers.end(); ++i)
-        delete *i;
-    delete xLogaxis;
-    delete yLogaxis;
-    delete graph2;
-    //delete graph;
-    delete canvas;
+        double level = 0.9;
+        graph->GetHistogram()->SetContour(1, &level);
+
+        //graph->Draw("col box scat");
+        //graph->Draw("SAME CONT1Z");
+
+        graph->Draw("CONT1Z");
+        xLogaxis->Draw();
+        yLogaxis->Draw();
+
+        for(auto i = markers.begin(); i!=markers.end(); ++i)
+            (*i)->Draw();
+
+        graph->GetHistogram()->GetZaxis()->SetLabelOffset(999);
+        graph->GetHistogram()->GetZaxis()->SetLabelSize(0);
+        graph->GetHistogram()->GetZaxis()->SetTickLength(0);
+
+        canvas->Update();
+        canvas->SaveAs("SensitivityMixing90.png");
+
+        for(auto i = markers.begin(); i!=markers.end(); ++i)
+            delete *i;
+        delete xLogaxis;
+        delete yLogaxis;
+        delete graph;
+        delete canvas;
+    }
+    {
+        std::vector<TMarker*> markers;
+        std::stringstream sstitle;
+        sstitle << std::setprecision(6);
+        sstitle << "Sensitivity #alpha=" << alpha << ";m_{#Chi} (GeV);#sigma=3Y/(c#alpha_{e}m_{#Chi}^{2})";
+        std::string title = sstitle.str();
+
+        TCanvas* canvas = new TCanvas("c1","canvas",1024,576);
+        canvas->SetLogz();
+        gStyle->SetPalette(55);
+        //gStyle->SetNumberContours(100);
+
+        TGraph2D* graph = new TGraph2D(masses.size());
+        graph->SetTitle(title.c_str());
+
+        for(int i = 0; i<masses.size(); ++i)
+        {
+            double mass = std::log10(masses[i]), sigma = std::log10(sigmas[i]);
+            graph->SetPoint(i, mass, sigma, chisqr[i]);
+
+            TMarker* m = new TMarker(mass, sigma, 0);
+            m->SetMarkerStyle(7);
+            markers.push_back(m);
+        }
+
+        TGaxis* xLogaxis;
+        TGaxis* yLogaxis;
+        {
+            double minx = graph->GetXmin();
+            double maxx = graph->GetXmax();
+            double miny = graph->GetYmin();
+            double maxy = graph->GetYmax();
+            xLogaxis = new TGaxis(minx, miny, maxx, miny, *std::min_element(masses.begin(), masses.end()), *std::max_element(masses.begin(), masses.end()), 510, "G");
+            yLogaxis = new TGaxis(minx, miny, minx, maxy, *std::min_element(sigmas.begin(), sigmas.end()), *std::max_element(sigmas.begin(), sigmas.end()), 510, "G");
+        }
+        //graph->SetNpx(500);
+        //graph->SetNpy(500);
+
+        //graph->Draw("col box scat");
+        //graph->Draw("SAME CONT1Z");
+
+        graph->Draw("CONT1Z");
+        xLogaxis->Draw();
+        yLogaxis->Draw();
+
+        for(auto i = markers.begin(); i!=markers.end(); ++i)
+            (*i)->Draw();
+
+        graph->GetHistogram()->GetXaxis()->SetLabelSize(0);
+        graph->GetHistogram()->GetXaxis()->SetTickLength(0);
+        graph->GetHistogram()->GetYaxis()->SetLabelSize(0);
+        graph->GetHistogram()->GetYaxis()->SetTickLength(0);
+        graph->GetHistogram()->GetYaxis()->SetTitleOffset(1.2);
+
+        canvas->Update();
+        canvas->SaveAs("SensitivitySigma.png");
+
+        double level = 0.9;
+        graph->GetHistogram()->SetContour(1, &level);
+
+        //graph->Draw("col box scat");
+        //graph->Draw("SAME CONT1Z");
+
+        graph->Draw("CONT1Z");
+        xLogaxis->Draw();
+        yLogaxis->Draw();
+
+        for(auto i = markers.begin(); i!=markers.end(); ++i)
+            (*i)->Draw();
+
+        graph->GetHistogram()->GetZaxis()->SetLabelOffset(999);
+        graph->GetHistogram()->GetZaxis()->SetLabelSize(0);
+        graph->GetHistogram()->GetZaxis()->SetTickLength(0);
+
+        canvas->Update();
+        canvas->SaveAs("SensitivitySigma90.png");
+
+        for(auto i = markers.begin(); i!=markers.end(); ++i)
+            delete *i;
+        delete xLogaxis;
+        delete yLogaxis;
+        delete graph;
+        delete canvas;
+    }
 }
 

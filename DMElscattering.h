@@ -5,6 +5,7 @@ class Particle;
 class DMscattering {
     std::vector<double> neutrino_sigma, neutrino_energy;
 public:
+    double pMax0;
     DMscattering();
 	double EeTheta (double,double,double);
 	double EeTMax (double,double);

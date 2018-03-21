@@ -167,16 +167,16 @@ double chisq_pullfunc(vector<double> &N_th, vector<double> &N_ex,
 double chisq_pullfunc(vector<double> &N_th, vector<double> &N_ex,
 		      vector<double> &cs_mean)
 {
-    std::cout << std::scientific;
-    for(auto x = N_th.begin(); x!=N_th.end(); ++x)
-        std::cout << *x << " ";
-    std::cout << std::endl << std::endl;
-    for(auto x = N_ex.begin(); x!=N_ex.end(); ++x)
-        std::cout << *x << " ";
-    std::cout << std::endl << std::endl;
-    for(auto x = cs_mean.begin(); x!=cs_mean.end(); ++x)
-        std::cout << *x << " ";
-    std::cout << std::endl << std::endl;
+    // std::cout << std::scientific;
+    // for(auto x = N_th.begin(); x!=N_th.end(); ++x)
+        // std::cout << *x << " ";
+    // std::cout << std::endl << std::endl;
+    // for(auto x = N_ex.begin(); x!=N_ex.end(); ++x)
+        // std::cout << *x << " ";
+    // std::cout << std::endl << std::endl;
+    // for(auto x = cs_mean.begin(); x!=cs_mean.end(); ++x)
+        // std::cout << *x << " ";
+    // std::cout << std::endl << std::endl;
 
 
 	double  x_n = 0, s_n = 0, x_k = 0, row1,st_n=0;

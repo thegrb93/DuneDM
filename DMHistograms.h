@@ -15,12 +15,12 @@ public:
     void AddProductionNu(double E, double Pz, double Pt, double Th, double W);
     void AddDetectorDM(double E, double x, double y, double Px, double Py, double Pz, double Pt, double Th, double Phi);
     void AddDetectorNu(double E, double Pz, double Pt, double Th, double W);
-    void AddScatterDM(double E, double Pz, double Pt, double Th);
+    void AddScatterDM(double E, double Pz, double Pt, double Th, double W);
     void AddScatterNu(double E, double Pz, double Pt, double Th, double W);
-    void AddScatterSigElectron(double E, double Pz, double Pt, double time, double Th);
+    void AddScatterSigElectron(double E, double Pz, double Pt, double time, double Th, double W);
     void AddScatterBgElectron(double E, double Pz, double Pt, double Th, double time, double W);
-    void ScaleDarkmatter(double scale, double detscale);
-    void ScaleNeutrinos(double scale, double detscale);
+    void ScaleDarkmatter(double scale);
+    void ScaleNeutrinos(double scale);
     void NormalizeHistograms();
     void SaveNeutrinos();
     void SaveHistograms();
