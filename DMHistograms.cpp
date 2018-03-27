@@ -22,13 +22,13 @@ DMHistograms::DMHistograms(std::string rname, TFile* dm, TFile* nu, bool nu_exis
 
     dm->cd();
 
-    dme1 = new TH1D("dme1","#chi Production Energy;E (GeV)", 100, 0, 60);
-    dme2 = new TH1D("dme2","#chi in Detector E;E (GeV)", 100, 0, 100);
-    dme3 = new TH1D("dme3","#chi Scatter E;E (GeV)", 100, 0, 100);
+    dme1 = new TH1D("dme1","#chi Production Energy;E (GeV)", 100, 0, 120);
+    dme2 = new TH1D("dme2","#chi in Detector E;E (GeV)", 100, 0, 120);
+    dme3 = new TH1D("dme3","#chi Scatter E;E (GeV)", 100, 0, 120);
 
-    dmpz1 = new TH1D("dmpz1","#chi Production P_{z};P_{z} (GeV/c)", 100, 0, 60);
-    dmpz2 = new TH1D("dmpz2","#chi in Detector P_{z};P_{z} (GeV/c)", 100, 0, 100);
-    dmpz3 = new TH1D("dmpz3","#chi Scatter P_{z};P_{z} (GeV/c)", 100, 0, 100);
+    dmpz1 = new TH1D("dmpz1","#chi Production P_{z};P_{z} (GeV/c)", 100, 0, 120);
+    dmpz2 = new TH1D("dmpz2","#chi in Detector P_{z};P_{z} (GeV/c)", 100, 0, 120);
+    dmpz3 = new TH1D("dmpz3","#chi Scatter P_{z};P_{z} (GeV/c)", 100, 0, 120);
 
     dmthe1 = new TH1D("dmthe1","#chi Production #theta;#theta", 100, 0, M_PI);
     dmthe2 = new TH1D("dmthe2","#chi in Detector #theta;#theta", 100, 0, 0.009);
@@ -51,10 +51,10 @@ DMHistograms::DMHistograms(std::string rname, TFile* dm, TFile* nu, bool nu_exis
 
     dmtime = new TH1D("dmtime","#chi arrival time;Time (s)", 100, 1.90965e-6, 1.90969e-6);
 
-    dm_ee1 = new TH1D("dm_ee1","#chi + e^{-} Scatter E;E (GeV)", 100, 0, 15);
+    dm_ee1 = new TH1D("dm_ee1","#chi + e^{-} Scatter E;E (GeV)", 100, 0, 0);
     dm_epz1 = new TH1D("dm_epz1","#chi + e^{-} Scatter P_{z};P_{z} (GeV/c)", 100, 0, 6);
     dm_ept1 = new TH1D("dm_ept1","#chi + e^{-} Scatter P_{t};P_{t} (GeV/c)", 100, 0, 6);
-    dm_ethe1 = new TH1D("dm_ethe1","#chi + e^{-} Scatter #theta;#theta", 100, 0, M_PI);
+    dm_ethe1 = new TH1D("dm_ethe1","#chi + e^{-} Scatter #theta;#theta", 100, 0, M_PI/2);
     dm_ee1smear = new TH1D("dm_ee1smear","#chi + e^{-} Smeared Scatter E;E (GeV)", 100, 0, 15);
     dm_ee1smearr = new TH1D("dm_ee1smearr","#chi + e^{-} Scatter Energy Smearing Ratio;E (GeV)", 40, 0, 15);
 
@@ -102,10 +102,10 @@ DMHistograms::DMHistograms(std::string rname, TFile* dm, TFile* nu, bool nu_exis
 
         nutime = new TH1D("nutime","#nu in Detector time;time", 100, 1.90965e-6, 1.90969e-6);
 
-        nu_ee1 = new TH1D("nu_ee1","#nu + e^{-} Scatter E;E (GeV)", 100, 0, 15);
+        nu_ee1 = new TH1D("nu_ee1","#nu + e^{-} Scatter E;E (GeV)", 100, 0, 0);
         nu_epz1 = new TH1D("nu_epz1","#nu + e^{-} Scatter P_{z};P_{z} (GeV/c)", 100, 0, 6);
         nu_ept1 = new TH1D("nu_ept1","#nu + e^{-} Scatter P_{z};P_{z} (GeV/c)", 100, 0, 6);
-        nu_ethe1 = new TH1D("nu_ethe1","#nu + e^{-} Scatter #theta;#theta", 100, 0, M_PI);
+        nu_ethe1 = new TH1D("nu_ethe1","#nu + e^{-} Scatter #theta;#theta", 100, 0, M_PI/2);
 
         nu_ee1smear = new TH1D("nu_ee1smear","#nu + e^{-} Smeared Scatter E;E (GeV)", 100, 0, 15);
         nu_ee1smearr = new TH1D("nu_ee1smearr","#nu + e^{-} Scatter Energy Smearing Ratio;E (GeV)", 40, 0, 15);
@@ -209,13 +209,17 @@ void saveComparison(TCanvas* canvas, const char* savename, const char* canvastit
     int colors2[] = {8, 4, 6};
 
     THStack *hs = new THStack("hs",canvastitle);
+    THStack *hs2 = new THStack("hs2",(std::string("Normalized ") + canvastitle).c_str());
 
-    TLegend *legend=new TLegend(0.8, 0.5, 1, 0.8);
-    //legend->SetTextFont(72);
+    TLegend *legend=new TLegend(0.7, 0.5, 1, 0.7);
     legend->SetTextSize(0.03);
+
+    TLegend *legend2=new TLegend(0.7, 0.5, 1, 0.7);
+    legend2->SetTextSize(0.03);
 
     for(int i = 0; i<std::min<int>(p1.size(), 3); ++i)
     {
+        if(!p1[i]) continue;
         p1[i]->SetLineColor(colors1[i]);
         p1[i]->SetLineWidth(2);
         hs->Add(p1[i]);
@@ -223,6 +227,7 @@ void saveComparison(TCanvas* canvas, const char* savename, const char* canvastit
     }
     for(int i = 0; i<std::min<int>(p2.size(), 3); ++i)
     {
+        if(!p2[i]) continue;
         p2[i]->SetLineColor(colors2[i]);
         p2[i]->SetLineWidth(2);
         hs->Add(p2[i]);
@@ -243,13 +248,29 @@ void saveComparison(TCanvas* canvas, const char* savename, const char* canvastit
     //canvas->Draw();
     canvas->SaveAs(("histograms/"+DMHistograms::run_name+"/"+std::string(savename)+"_log.png").c_str());
 
-    for(int i = 0; i<std::min<int>(p1.size(), 3); ++i)
-        p1[i]->Scale(1.0/p1[i]->Integral());
-    for(int i = 0; i<std::min<int>(p2.size(), 3); ++i)
-        p2[i]->Scale(1.0/p2[i]->Integral());
+    std::vector<TH1D*> clones;
+    for(int i = 0; i<std::min<int>(p1.size(), 3); ++i){
+        if(!p1[i]) continue;
+        TH1D* h = (TH1D*)p1[i]->Clone();
+        h->Scale(1.0/h->Integral());
 
-    hs->Draw("hist nostack");
-    legend->Draw();
+        legend2->AddEntry(h,p1_labels[i].c_str());
+        hs2->Add(h);
+        clones.push_back(h);
+    }
+    for(int i = 0; i<std::min<int>(p2.size(), 3); ++i){
+        if(!p2[i]) continue;
+        TH1D* h = (TH1D*)p2[i]->Clone();
+        h->Scale(1.0/h->Integral());
+
+        legend2->AddEntry(h,p2_labels[i].c_str());
+        hs2->Add(h);
+        clones.push_back(h);
+    }
+
+    hs2->Draw("hist nostack");
+    hs2->GetYaxis()->SetTickLength(0);
+    legend2->Draw();
 
     canvas->SetLogy(0);
     canvas->Update();
@@ -261,8 +282,12 @@ void saveComparison(TCanvas* canvas, const char* savename, const char* canvastit
     //canvas->Draw();
     canvas->SaveAs(("histograms/"+DMHistograms::run_name+"/"+std::string(savename)+"_norm_log.png").c_str());
 
+    for(auto i = clones.begin(); i!=clones.end(); ++i)
+        delete *i;
     delete legend;
+    delete legend2;
     delete hs;
+    delete hs2;
 }
 
 void normalizeHisto(TH1* hist){
@@ -397,7 +422,7 @@ void DMHistograms::SaveHistograms() {
     std::cout << "Writing DM RootFile.\n";
     dm_output->Write();
 
-    TCanvas* canvas = new TCanvas("c1","canvas",1920,1080);
+    TCanvas* canvas = new TCanvas("c1","canvas",1300,1000);
 
     /*saveHistogram(canvas, dmpx1);
     saveHistogram(canvas, dmpy1);
@@ -473,17 +498,19 @@ void DMHistograms::SaveHistograms() {
     std::vector<std::string> legend_labels_echi{"e^{-} scattered via #chi #bar{#chi}"};
     std::vector<std::string> legend_labels_enu{"e^{-} scattered via #nu_{e}"};
 
-    //saveComparison(canvas, "nu_dmpx1", "DM vs Neutrino P_{x};P_{x} (GeV/c)", dmpx1, nupx1, "Dark matter P_{x}", "Neutrino P_{x}");
-    //saveComparison(canvas, "nu_dmpy1", "DM vs Neutrino P_{y};P_{y} (GeV/c)", dmpy1, nupy1, "Dark matter P_{y}", "Neutrino P_{y}");
-    saveComparison(canvas, "nu_dmpz", "DM vs Neutrino P_{z};P_{z} (GeV/c)", std::vector<TH1D*>{dmpz1, dmpz2, dmpz3}, std::vector<TH1D*>{nupz1, nupz2, nupz3}, legend_labels_chi, legend_labels_nu);
-    //saveComparison(canvas, "nu_dmpt1", "DM vs Neutrino P_{t};P_{t} (GeV/c)", dmpt1, nupt1, "Dark matter P_{t}", "Neutrino P_{t}");
-    saveComparison(canvas, "nu_dme", "DM vs Neutrino Energies;E (GeV)", std::vector<TH1D*>{dme1, dme2, dme3}, std::vector<TH1D*>{nue1, nue2, nue3}, legend_labels_chi, legend_labels_nu);
-    saveComparison(canvas, "nu_dmet1", "DM vs Neutrino #theta;#theta (rad)", std::vector<TH1D*>{dmthe1, dmthe2, dmthe3}, std::vector<TH1D*>{nuthe1, nuthe2, nuthe3}, legend_labels_chi, legend_labels_nu);
+    //saveComparison(canvas, "nu_dmpx1", "Dark Matter and Neutrino P_{x};P_{x} (GeV/c)", dmpx1, nupx1, "Dark matter P_{x}", "Neutrino P_{x}");
+    //saveComparison(canvas, "nu_dmpy1", "Dark Matter and Neutrino P_{y};P_{y} (GeV/c)", dmpy1, nupy1, "Dark matter P_{y}", "Neutrino P_{y}");
+    // saveComparison(canvas, "nu_dmpz", "Dark Matter and Neutrino P_{z};P_{z} (GeV/c)", std::vector<TH1D*>{dmpz1, dmpz2, dmpz3}, std::vector<TH1D*>{nupz1, nupz2, nupz3}, legend_labels_chi, legend_labels_nu);
+    //saveComparison(canvas, "nu_dmpt1", "Dark Matter and Neutrino P_{t};P_{t} (GeV/c)", dmpt1, nupt1, "Dark matter P_{t}", "Neutrino P_{t}");
+    saveComparison(canvas, "nu_dme", "Dark Matter and Neutrino Energies;E (GeV)", std::vector<TH1D*>{dme1, dme2, dme3}, std::vector<TH1D*>{nue1, nue2, nue3}, legend_labels_chi, legend_labels_nu);
+    saveComparison(canvas, "nu_dmth1", "Dark Matter and Neutrino #theta;#theta (rad)", std::vector<TH1D*>{dmthe1, dmthe2, dmthe3}, std::vector<TH1D*>{nuthe1, nuthe2, nuthe3}, legend_labels_chi, legend_labels_nu);
 
-    saveComparison(canvas, "nu_dm_epz", "DM vs Neutrino Electron Scatter P_{z};P_{z} (GeV/c)", std::vector<TH1D*>{dm_epz1}, std::vector<TH1D*>{nu_epz1}, legend_labels_echi, legend_labels_enu);
+    saveComparison(canvas, "nu_dmth2", "Dark Matter and Neutrino Zoomed #theta;#theta (rad)", std::vector<TH1D*>{0, dmthe2, dmthe3}, std::vector<TH1D*>{0, nuthe2, nuthe3}, legend_labels_chi, legend_labels_nu);
+
+    // saveComparison(canvas, "nu_dm_epz", "Dark Matter and Neutrino Electron Scatter P_{z};P_{z} (GeV/c)", std::vector<TH1D*>{dm_epz1}, std::vector<TH1D*>{nu_epz1}, legend_labels_echi, legend_labels_enu);
     // saveComparison(canvas, "nu_dm_ept", "Electron Scatter P_{t};P_{t} (GeV/c)", dm_ept1, nu_ept1, "Electron - Dark matter P_{t}", "Electron - Neutrino P_{t}");
-    saveComparison(canvas, "nu_dm_ee", "DM vs Neutrino Electron Scatter E;E (GeV)", std::vector<TH1D*>{dm_ee1}, std::vector<TH1D*>{nu_ee1}, legend_labels_echi, legend_labels_enu);
-    saveComparison(canvas, "nu_dm_etheta", "DM vs Neutrino Electron Scatter #theta;#theta (rad)", std::vector<TH1D*>{dm_ethe1}, std::vector<TH1D*>{nu_ethe1}, legend_labels_echi, legend_labels_enu);
+    saveComparison(canvas, "nu_dm_ee", "Dark Matter and Neutrino Electron Scatter E;E (GeV)", std::vector<TH1D*>{dm_ee1}, std::vector<TH1D*>{nu_ee1}, legend_labels_echi, legend_labels_enu);
+    saveComparison(canvas, "nu_dm_etheta", "Dark Matter and Neutrino Electron Scatter #theta;#theta (rad)", std::vector<TH1D*>{dm_ethe1}, std::vector<TH1D*>{nu_ethe1}, legend_labels_echi, legend_labels_enu);
     // saveComparison(canvas, "nu_dm_time", "Electron Time;Time", dmtime, nutime, "Electron - Dark matter Time", "Electron - Neutrino Time");
 
     delete canvas;
@@ -615,8 +642,8 @@ void DMHistograms::AddDetectorNu(double E, double Pz, double Pt, double Th, doub
 void DMHistograms::AddScatterNu(double E, double Pz, double Pt, double Th, double W) {
     nue3->Fill(E, W);
     nupz3->Fill(Pz, W);
-    //nupt3->Fill(Pt, W);
-    //nuthe3->Fill(Th, W);
+    nupt3->Fill(Pt, W);
+    nuthe3->Fill(Th, W);
 
     /*if (smear_sigma > 0) {
         E += Random::Gauss(smear_mean, smear_sigma / sqrt(E));

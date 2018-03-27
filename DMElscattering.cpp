@@ -20,6 +20,14 @@ DMscattering::DMscattering() {
         fneutrino >> neutrino_sigma[size];
     }
 }
+
+// Electron angle as a function of
+// electron energy and dark matter energy and mass
+double ThetaEe (double Ee, double EDM, double MDM) {
+	double Me = 0.000511;
+	return(acos(sqrt((Ee-Me)/(Ee+Me))*(EDM+Me)/sqrt(EDM*EDM-MDM*MDM)));
+}
+
 // Electron energy as a function of
 // electron scattering angle cross and dark matter energy
 double DMscattering::EeTheta (double EDM, double Thetael, double MDM) {
@@ -177,35 +185,30 @@ void DMscattering::scatterevent (double MDP, double MDM, double kap, double alD,
     double Pi = 3.141592653589793;
     double Me = 0.000511;
     double EeMin, EeMax;
-    double xe, ye, Thetae, Phie, Ee;
+    double xe, ye, Thetae, Phie;
     double pe, pex, pey, pez;
     double dsig, sig, psig;
     double dsigMax, psigMax;
     double probe, Re;
     EeMax = EeTMax(DM.E,MDM);
     EeMin = EeTMin(DM.E,MDM);
-    sig = sigma(DM.E,MDM,MDP,kap,alD);
     dsigMax = dsigmadEe(EeMin,DM.E,MDM,MDP,kap,alD);
-    psigMax =(EeMax-EeMin)*dsigMax/sig;
 
     while (1) {
         probe = Random::Flat(0, 1);
-        xe = Random::Flat(0, 1);
-        Thetae = xe * Pi / 2.0;
+        xe = Random::Flat(0, 1) *(EeMax-EeMin)+EeMin;
 
-        Ee = EeTheta (DM.E,Thetae,MDM);
-			//Ee = EeMin + xEe*(EeMax-EeMin);
-        dsig = dsigmadEe(Ee, DM.E, MDM, MDP, kap, alD);
-        psig = (EeMax - EeMin) * dsig / sig;
-        Re = psig / psigMax;
+        dsig = dsigmadEe(xe, DM.E, MDM, MDP, kap, alD);
+        Re = dsig / dsigMax;
         if (Re > probe) {
+            Thetae = ThetaEe(xe,DM.E,DM.m);
             ye = Random::Flat(0, 1);
             Phie = ye * 2.0 * Pi;
-            pe = sqrt(Ee * Ee - Me * Me);
+            pe = sqrt(xe * xe - Me * Me);
             pex = pe * sin(Thetae) * cos(Phie);
             pey = pe * sin(Thetae) * sin(Phie);
             pez = pe * cos(Thetae);
-            electron.FourMomentum(pex, pey, pez, Ee);
+            electron.FourMomentum(pex, pey, pez, xe);
             break;
         }
     }
@@ -213,7 +216,6 @@ void DMscattering::scatterevent (double MDP, double MDM, double kap, double alD,
 //
 void DMscattering::scattereventNeutrino (Particle& DM, Particle &electron) {
     double Pi = 3.141592653589793;
-    double convcross2cm2 = 1e-42;
     double Me = 0.000511;
     double EeMin, EeMax;
     double xe, ye, Thetae, Phie, Ee;
@@ -223,17 +225,16 @@ void DMscattering::scattereventNeutrino (Particle& DM, Particle &electron) {
     double probe, Re;
     EeMax = 2*Me*DM.E*DM.E / (std::pow(Me + DM.E, 2) - DM.E*DM.E);
     EeMin = 0;
-    sig = nuSigma(DM.E) * convcross2cm2;
-    if(sig<0) return;
-    dsigMax = nudSigmadEe(DM.E, 0);
 
+    // sig = nuSigma(DM.E) * convcross2cm2;
+    // if(sig<0) std::cout << "ERROR INVALID NEUTRINO ENERGY!!!!\n"; return;
     // const double step = 0.01;
     // double integratedSigma = 0;
     // for(double t = 0; t<=Pi/2; t+=step)
         // integratedSigma += nudSigmadEe(DM.E, t)*step;
     // std::cout << "Emphirical Sigma: " << sig << "     Estimated Sigma: " << 17.23e-43*DM.E << "    Integrated Sigma: " << integratedSigma << std::endl;
 
-    psigMax =(EeMax-EeMin)*dsigMax/sig;
+    dsigMax = nudSigmadEe(DM.E, Pi/2);
 
     while (1)
     {
@@ -241,12 +242,11 @@ void DMscattering::scattereventNeutrino (Particle& DM, Particle &electron) {
         xe = Random::Flat(0,1);
         Thetae = xe * Pi / 2.0;
 
-        Ee = EeMin + xe*(EeMax-EeMin);
         dsig = nudSigmadEe(DM.E, Thetae);
-        psig = (EeMax-EeMin)*dsig/sig;
-        Re = psig/psigMax;
+        Re = dsig/dsigMax;
         if (Re > probe)
         {
+            Ee = EeMin + xe*(EeMax-EeMin);
             ye = Random::Flat(0,1);
             Phie = ye*2.0*Pi;
             pe = sqrt(Ee*Ee-Me*Me);

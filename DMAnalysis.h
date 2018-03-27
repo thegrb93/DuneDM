@@ -55,6 +55,7 @@ class SensitivityAnalysis : public DMAnalysis
 	double smear_sigma;
 	double smear_mean;
     double detector_efficiency;
+    int nbins; double minbin, maxbin;
 	TH1D *dm_energy, *nu_energy;
 	TProfile *theta_avg;
 	TFile* nu_cache, *dm_cache;

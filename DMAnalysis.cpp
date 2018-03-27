@@ -39,8 +39,8 @@
 #include "Random.h"
 
 const double emass = 0.000511;
-double desired_pot = 1.47e21 * 3.5 * 0.5; //80GeV POT, 3.5 years, 50% Duty factor
-//double desired_pot = 1.1e21; //120GeV
+//double desired_pot = 1.47e21 * 3.5 * 0.5; //80GeV, 3.5 years, 50% Duty factor
+double desired_pot = 1.1e21 * 3.5 * 0.5; //120GeV, 3.5 years, 50% Duty factor
 double nu_pot = 50000000;
 
 void getFolderFiles(std::string path, std::vector<std::string>& files) {
@@ -426,6 +426,9 @@ SensitivityAnalysis::SensitivityAnalysis(){
     chisqr = 0;
     xsection = 0;
     detector_efficiency = 0.9;
+    nbins = 20;
+    minbin = 0.3;
+    maxbin = 15;
     binstart_max = 0;
     binend_max = 0;
     loadedDM = false;
@@ -455,7 +458,7 @@ int SensitivityAnalysis::Init(TFile* file, TBranch* branch) {
     else
     {
         nu_cache = new TFile(neutrino_root.c_str(), "NEW");
-        nu_energy = new TH1D("nuenergy","nuenergy",20,0.3,2);
+        nu_energy = new TH1D("nuenergy","nuenergy",nbins,minbin,maxbin);
         iterateNeutrino(
         [=](Particle&, double){},
         [=](Particle&, double){},
@@ -485,8 +488,8 @@ int SensitivityAnalysis::Init(TFile* file, TBranch* branch) {
     {
         std::cout << "Creating: " << sdmfile << std::endl;
         dm_cache = new TFile(sdmfile.c_str(), "NEW");
-        dm_energy = new TH1D("nth","nth",20,0.3,2);
-        theta_avg = new TProfile("theta","theta",20,0.3,2);
+        dm_energy = new TH1D("nth","nth",nbins,minbin,maxbin);
+        theta_avg = new TProfile("theta","theta",nbins,minbin,maxbin);
         xsection = new TVectorD(2);
         xsection->operator()(0) = 0;
         xsection->operator()(1) = 0;
@@ -544,9 +547,13 @@ void SensitivityAnalysis::UnInit() {
         // for(int binend = binstart+1; binend<=nbins; ++binend){
             std::vector<double> N_th, N_ex, cs_mean;
             for(int i = binstart; i<binend; ++i){
-                N_th.push_back((dm_energy->GetBinContent(i)+nu_energy->GetBinContent(i)) * detector_efficiency);
-                N_ex.push_back((nu_energy->GetBinContent(i)) * detector_efficiency);
-                cs_mean.push_back(theta_avg->GetBinContent(i));
+                double N_x = dm_energy->GetBinContent(i);
+                double N_v = nu_energy->GetBinContent(i);
+                if(N_v > 0){
+                    N_th.push_back((N_x+N_v) * detector_efficiency);
+                    N_ex.push_back(N_v * detector_efficiency);
+                    cs_mean.push_back(theta_avg->GetBinContent(i));
+                }
             }
             double newchisqr = chisq_pullfunc(N_th, N_ex, cs_mean);
             // if(newchisqr > chisqr){
@@ -640,7 +647,7 @@ int SensitivityScan::Process(const std::vector<std::string>& folders){
                     double x, y;
                     obj->GetPoint(i, x, y);
                     if(waslast){
-                        const double spacing = 0.075;
+                        const double spacing = 0.09;
 
                         double dirx = x - lastx, diry = y - lasty;
                         double length = std::sqrt(dirx*dirx + diry*diry);
@@ -699,10 +706,11 @@ int SensitivityScan::Process(const std::vector<std::string>& folders){
         std::vector<TMarker*> markers;
         std::stringstream sstitle;
         sstitle << std::setprecision(6);
-        sstitle << "Sensitivity #alpha=" << alpha << ";m_{#Chi} (GeV);Y=#epsilon^{2}#alpha(m_{#Chi}/m_{A'})^{4}";
+        sstitle << "90% Confidence Level - 1.925#times10^{21} POT at 120GeV, m_{V} = 3m_{#chi}, #alpha=" << alpha << ";m_{#chi} (GeV);Y=#epsilon^{2}#alpha(m_{#chi}/m_{V})^{4}";
         std::string title = sstitle.str();
 
         TCanvas* canvas = new TCanvas("c1","canvas",1024,576);
+        // canvas->SetFrameLineColor(0);
         canvas->SetLogz();
         gStyle->SetPalette(55);
         //gStyle->SetNumberContours(100);
@@ -762,8 +770,8 @@ int SensitivityScan::Process(const std::vector<std::string>& folders){
         xLogaxis->Draw();
         yLogaxis->Draw();
 
-        for(auto i = markers.begin(); i!=markers.end(); ++i)
-            (*i)->Draw();
+        // for(auto i = markers.begin(); i!=markers.end(); ++i)
+            // (*i)->Draw();
 
         graph->GetHistogram()->GetZaxis()->SetLabelOffset(999);
         graph->GetHistogram()->GetZaxis()->SetLabelSize(0);
@@ -783,10 +791,11 @@ int SensitivityScan::Process(const std::vector<std::string>& folders){
         std::vector<TMarker*> markers;
         std::stringstream sstitle;
         sstitle << std::setprecision(6);
-        sstitle << "Sensitivity #alpha=" << alpha << ";m_{#Chi} (GeV);#sigma=3Y/(c#alpha_{e}m_{#Chi}^{2})";
+        sstitle << "90% Confidence Level - 1.925#times10^{21} POT at 120GeV, m_{V} = 3m_{#chi}, #alpha=" << alpha << ";m_{#chi} (GeV);#sigma=3Y/(c#alpha_{e}m_{#chi}^{2})";
         std::string title = sstitle.str();
 
         TCanvas* canvas = new TCanvas("c1","canvas",1024,576);
+        // canvas->SetFrameLineColor(0);
         canvas->SetLogz();
         gStyle->SetPalette(55);
         //gStyle->SetNumberContours(100);
@@ -846,8 +855,8 @@ int SensitivityScan::Process(const std::vector<std::string>& folders){
         xLogaxis->Draw();
         yLogaxis->Draw();
 
-        for(auto i = markers.begin(); i!=markers.end(); ++i)
-            (*i)->Draw();
+        // for(auto i = markers.begin(); i!=markers.end(); ++i)
+            // (*i)->Draw();
 
         graph->GetHistogram()->GetZaxis()->SetLabelOffset(999);
         graph->GetHistogram()->GetZaxis()->SetLabelSize(0);
