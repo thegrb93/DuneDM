@@ -706,7 +706,7 @@ int SensitivityScan::Process(const std::vector<std::string>& folders){
         std::vector<TMarker*> markers;
         std::stringstream sstitle;
         sstitle << std::setprecision(6);
-        sstitle << "90% Confidence Level - 1.925#times10^{21} POT at 120GeV, m_{V} = 3m_{#chi}, #alpha=" << alpha << ";m_{#chi} (GeV);Y=#epsilon^{2}#alpha(m_{#chi}/m_{V})^{4}";
+        sstitle << "90% Confidence Level - 1.925#times10^{21} POT at 120GeV, m_{V} = 3m_{#chi}, #alpha=" << alpha << ";m_{#chi} (GeV);Y=#kappa^{2}#alpha(m_{#chi}/m_{V})^{4}";
         std::string title = sstitle.str();
 
         TCanvas* canvas = new TCanvas("c1","canvas",1024,576);
