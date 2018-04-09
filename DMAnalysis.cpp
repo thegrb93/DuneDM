@@ -143,15 +143,23 @@ void iterateNeutrino(
             bsim::NuRay det_ray = dk2nu->nuray[1];
             neutrino.FourMomentum(det_ray.px, det_ray.py, det_ray.pz, det_ray.E);
             neutrino.calcOptionalKinematics();
-            fdetector(neutrino, nimpwt * det_ray.wgt);
 
-            if (scatter.probscatterNeutrino(neutrino, 5.0)) {
-                double time = 575.0 / ( neutrino.norm / neutrino.E * 299792458.0 );
-                Particle neutrino2 = neutrino;
-                scatter.scattereventNeutrino(neutrino2, electron);
-                neutrino2.calcOptionalKinematics();
-                electron.calcOptionalKinematics();
-                fscatter(neutrino, neutrino2, electron, time, nimpwt * det_ray.wgt * scatter.pMax0);
+            bsim::Ancestor& parent_info = dk2nu->ancestor[1];
+            bsim::Ancestor& neutrino_info = dk2nu->ancestor[dk2nu->ancestor.size()-1];
+            double tmin, tmax;
+            double nu_x = neutrino_info.startx/100.0, nu_y = neutrino_info.starty/100.0, nu_z = neutrino_info.startz/100.0;
+            if(det.intersect(nu_x, nu_y, nu_z, neutrino.normpx, neutrino.normpy, neutrino.normpz, tmin, tmax))
+            {
+                fdetector(neutrino, nimpwt * det_ray.wgt);
+                if (scatter.probscatterNeutrino(neutrino, tmax - tmin)) {
+                    double distance = Random::Flat(tmin,tmax);
+                    double time = (neutrino_info.startt - parent_info.startt) + distance / ( neutrino.norm / neutrino.E * 0.299792458 ); //neutrino creation time + travel time
+                    Particle neutrino2 = neutrino;
+                    scatter.scattereventNeutrino(neutrino2, electron);
+                    neutrino2.calcOptionalKinematics();
+                    electron.calcOptionalKinematics();
+                    fscatter(neutrino, neutrino2, electron, time, nimpwt * det_ray.wgt * scatter.pMax0);
+                }
             }
         }
         std::cout << std::endl;
@@ -209,7 +217,7 @@ void iterateDarkmatter(TBranch* branch, double vpmass, double chimass, double ka
                 fdetector(darkmatter, tmin, tmax);
                 double pathlength = tmax-tmin;
                 if(scatter.probscatter(vpmass,chimass,kappa,alpha,darkmatter,pathlength)) {
-                    double time = tmin / ( darkmatter.norm / darkmatter.E * 299792458.0 );
+                    double time = Random::Flat(tmin,tmax) / ( darkmatter.norm / darkmatter.E * 0.299792458 );
                     Particle darkmatter2 = darkmatter;
                     scatter.scatterevent(vpmass, chimass, kappa, alpha, darkmatter2, electron);
                     darkmatter2.calcOptionalKinematics();

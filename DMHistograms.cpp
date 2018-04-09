@@ -1,5 +1,6 @@
 #include "DMHistograms.h"
 #include "DMAnalysis.h"
+#include "Random.h"
 
 #include <TFile.h>
 #include <TH1D.h>
@@ -15,6 +16,7 @@
 std::string DMHistograms::run_name;
 
 DMHistograms::DMHistograms(std::string rname, TFile* dm, TFile* nu, bool nu_exists) {
+    timesmear = 4.2;
     run_name = rname;
     dm_output = dm;
     nu_output = nu;
@@ -49,7 +51,8 @@ DMHistograms::DMHistograms(std::string rname, TFile* dm, TFile* nu, bool nu_exis
     dmx2 = new TH1D("dmx2","#chi in Detector x;x (m)", 100, -1.5, 1.5);
     dmy2 = new TH1D("dmy2","#chi in Detector y;y (m)", 100, -1, 1);
 
-    dmtime = new TH1D("dmtime","#chi arrival time;Time (s)", 100, 1.90965e-6, 1.90969e-6);
+    dmtime = new TH1D("dmtime","#chi arrival time;Time (ns)", 100, 1850, 2200);
+    dmtimesmeared = new TH1D("dmtimesmeared","#chi arrival time smeared;Time (ns)", 100, 1850, 2200);
 
     dm_ee1 = new TH1D("dm_ee1","#chi + e^{-} Scatter E;E (GeV)", 100, 0, 0);
     dm_epz1 = new TH1D("dm_epz1","#chi + e^{-} Scatter P_{z};P_{z} (GeV/c)", 100, 0, 6);
@@ -73,6 +76,7 @@ DMHistograms::DMHistograms(std::string rname, TFile* dm, TFile* nu, bool nu_exis
         nu_output->GetObject("nue3", nue3);
         nu_output->GetObject("nuthe3", nuthe3);
         nu_output->GetObject("nutime", nutime);
+        nu_output->GetObject("nutimesmeared", nutimesmeared);
         nu_output->GetObject("nu_epz1", nu_epz1);
         nu_output->GetObject("nu_ept1", nu_ept1);
         nu_output->GetObject("nu_ethe1", nu_ethe1);
@@ -100,7 +104,8 @@ DMHistograms::DMHistograms(std::string rname, TFile* dm, TFile* nu, bool nu_exis
         nuthe2 = new TH1D("nuthe2","#nu in Detector #theta;#theta", 100, 0, 0.009);
         nuthe3 = new TH1D("nuthe3","#nu in Detector #theta;#theta", 100, 0, 0.009);
 
-        nutime = new TH1D("nutime","#nu in Detector time;time", 100, 1.90965e-6, 1.90969e-6);
+        nutime = new TH1D("nutime","#nu in Detector time;time (ns)", 100, 1850, 2200);
+        nutimesmeared = new TH1D("nutimesmeared","#nu in Detector time smeared;time (ns)", 100, 1850, 2200);
 
         nu_ee1 = new TH1D("nu_ee1","#nu + e^{-} Scatter E;E (GeV)", 100, 0, 0);
         nu_epz1 = new TH1D("nu_epz1","#nu + e^{-} Scatter P_{z};P_{z} (GeV/c)", 100, 0, 6);
@@ -146,7 +151,6 @@ DMHistograms::~DMHistograms() {
     delete dmpz1;
     //delete dmpt1;
     delete dme1;
-    //delete dmtime;
     delete dmthe1;
     delete dmphi1;
     delete dmxy2;
@@ -168,6 +172,8 @@ DMHistograms::~DMHistograms() {
     delete dm_ee1;
     delete dm_ee1smear;
     delete dm_ee1smearr;
+    delete dmtime;
+    delete dmtimesmeared;
 
     delete nupz1;
     delete nupt1;
@@ -182,6 +188,7 @@ DMHistograms::~DMHistograms() {
     delete nue3;
     delete nuthe3;
     delete nutime;
+    delete nutimesmeared;
     delete nu_epz1;
     delete nu_ept1;
     delete nu_ethe1;
@@ -315,7 +322,6 @@ void DMHistograms::NormalizeHistograms() {
     normalizeHisto(dmpz1);
     //normalizeHisto(dmpt1);
     normalizeHisto(dme1);
-    normalizeHisto(dmtime);
     normalizeHisto(dmthe1);
     normalizeHisto(dmphi1);
     normalizeHisto(dmxy2);
@@ -336,10 +342,11 @@ void DMHistograms::NormalizeHistograms() {
     normalizeHisto(dm_ee1);
     normalizeHisto(dm_ee1smear);
     normalizeHisto(dm_ee1smearr);
+    normalizeHisto(dmtime);
+    normalizeHisto(dmtimesmeared);
 
     normalizeHisto(nupz1);
     normalizeHisto(nue1);
-    normalizeHisto(nutime);
     normalizeHisto(nupz2);
     normalizeHisto(nue2);
     normalizeHisto(nuthe1);
@@ -353,6 +360,8 @@ void DMHistograms::NormalizeHistograms() {
     normalizeHisto(nu_ee1);
     normalizeHisto(nu_ee1smear);
     normalizeHisto(nu_ee1smearr);
+    normalizeHisto(nutime);
+    normalizeHisto(nutimesmeared);
 
     /*normalizeHisto(nue_e);
     normalizeHisto(nuebar_e);
@@ -511,7 +520,8 @@ void DMHistograms::SaveHistograms() {
     // saveComparison(canvas, "nu_dm_ept", "Electron Scatter P_{t};P_{t} (GeV/c)", dm_ept1, nu_ept1, "Electron - Dark matter P_{t}", "Electron - Neutrino P_{t}");
     saveComparison(canvas, "nu_dm_ee", "Dark Matter and Neutrino Electron Scatter E;E (GeV)", std::vector<TH1D*>{dm_ee1}, std::vector<TH1D*>{nu_ee1}, legend_labels_echi, legend_labels_enu);
     saveComparison(canvas, "nu_dm_etheta", "Dark Matter and Neutrino Electron Scatter #theta;#theta (rad)", std::vector<TH1D*>{dm_ethe1}, std::vector<TH1D*>{nu_ethe1}, legend_labels_echi, legend_labels_enu);
-    // saveComparison(canvas, "nu_dm_time", "Electron Time;Time", dmtime, nutime, "Electron - Dark matter Time", "Electron - Neutrino Time");
+    saveComparison(canvas, "nu_dm_time", "Electron Scatter Time;Time (ns)", std::vector<TH1D*>{dmtime}, std::vector<TH1D*>{nutime}, legend_labels_echi, legend_labels_enu);
+    saveComparison(canvas, "nu_dm_timesmeared", "Electron Scatter Time Smeared;Time (ns)", std::vector<TH1D*>{dmtimesmeared}, std::vector<TH1D*>{nutimesmeared}, legend_labels_echi, legend_labels_enu);
 
     delete canvas;
 }
@@ -543,6 +553,7 @@ void DMHistograms::ScaleDarkmatter(double scale) {
     dm_ept1->Scale(scale);
     dm_ethe1->Scale(scale);
     dmtime->Scale(scale);
+    dmtimesmeared->Scale(scale);
 }
 
 void DMHistograms::ScaleNeutrinos(double scale) {
@@ -563,6 +574,7 @@ void DMHistograms::ScaleNeutrinos(double scale) {
     nu_ee1->Scale(scale);
     nu_ethe1->Scale(scale);
     nutime->Scale(scale);
+    nutimesmeared->Scale(scale);
 }
 
 void DMHistograms::AddProductionDM(TH1D* E, TH1D* Px, TH1D* Py, TH1D* Pz, TH1D* Th, TH1D* Phi) {
@@ -607,6 +619,9 @@ void DMHistograms::AddScatterSigElectron(double E, double Pz, double Pt, double 
         dm_ee1smear->Fill(Es);
         dm_ee1smearr->Fill(E / Es);
     }*/
+    if (timesmear > 0) {
+        dmtimesmeared->Fill(time + Random::Gauss(0, timesmear), W);
+    }
 }
 
 void DMHistograms::AddProductionNu(double E, double Pz, double Pt, double Th, double W) {
@@ -664,5 +679,8 @@ void DMHistograms::AddScatterBgElectron(double E, double Pz, double Pt, double T
         dme3smearr->Fill(darkmatter1.E / darkmatter1E);
         dm_ee1smearr->Fill(electron1.E / electron1E);
     }*/
+    if (timesmear > 0) {
+        nutimesmeared->Fill(time + Random::Gauss(0, timesmear), W);
+    }
 }
 

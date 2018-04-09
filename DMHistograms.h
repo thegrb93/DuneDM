@@ -28,13 +28,14 @@ public:
     static std::string run_name;
     TFile* dm_output, *nu_output;
     bool found_nu_output;
+    double timesmear;
+
     //Misc
-    TH1D *dmtime;
     TH2D *dmxy2;
     //Input dark matter distributions
-    TH1D *dmpx1, *dmpy1, *dmpz1, *dmpt1, *dme1, *dmthe1, *dmphi1, *dmx2, *dmy2, *dmpx2, *dmpy2, *dmpz2, *dmpt2, *dme2, *dmthe2, *dmphi2, *dmpz3, *dme3, *dmthe3;
+    TH1D *dmpx1, *dmpy1, *dmpz1, *dmpt1, *dme1, *dmthe1, *dmphi1, *dmx2, *dmy2, *dmpx2, *dmpy2, *dmpz2, *dmpt2, *dme2, *dmthe2, *dmphi2, *dmpz3, *dme3, *dmthe3, *dmtime, *dmtimesmeared;
     //Input neutrino distributions
-    TH1D *nupz1, *nupt1, *nue1, *nuthe1, *nupz2, *nupt2, *nue2, *nuthe2, *nupz3, *nupt3, *nue3, *nuthe3, *nutime;
+    TH1D *nupz1, *nupt1, *nue1, *nuthe1, *nupz2, *nupt2, *nue2, *nuthe2, *nupz3, *nupt3, *nue3, *nuthe3, *nutime, *nutimesmeared;
     //Signal-electron distributions
     TH1D *dm_epz1, *dm_ept1, *dm_ethe1, *dm_ee1, *dm_ee1smear, *dm_ee1smearr;
     //Background-electron distributions
